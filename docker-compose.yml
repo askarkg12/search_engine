@@ -1,0 +1,21 @@
+services:
+  front:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: frontend-service
+    ports:
+      - "8501:8501"
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile  # Path to the Dockerfile for the server service
+    container_name: server-service
+    ports:
+      - "80:80"
+
+# Optional: Define any shared networks or volumes if needed
+# networks:
+#   default:
+#     name: my_network  # Define a custom network name if needed
