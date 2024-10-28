@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir --upgrade -r /requirements.txt
 
 COPY ./server ./server
 COPY ./model ./model
-COPY ./weights ./weights
+# COPY ./weights ./weights
 COPY ./utils ./utils
 COPY ./dataset/internet ./dataset/internet
 
