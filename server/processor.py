@@ -14,8 +14,8 @@ from utils.tokeniser import Tokeniser
 from pathlib import Path
 from torch.nn.functional import cosine_similarity
 
-CACHED_ENCODINGS_PATH = Path("app/weights/cached_encodings.pkl")
-TT_MODEL_PATH = Path("app/weights/tt_weights.pth")
+CACHED_ENCODINGS_PATH = Path("weights/doc_encodings.pth")
+TT_MODEL_PATH = Path("weights/tt_weights.pth")
 DOCS_PATH = Path("dataset/internet/all_docs")
 
 VOCAB_SIZE = 81_547
@@ -35,12 +35,13 @@ print("Model loaded")
 
 tokeniser = Tokeniser()
 
-with open(CACHED_ENCODINGS_PATH, "rb") as f:
-    cached_encodings = pickle.load(f)
+# with open(CACHED_ENCODINGS_PATH, "rb") as f:
+#     cached_encodings = pickle.load(f)
 
 # Shape: (num_encodings, encoding_dim)
-cached_encodings_tensors = torch.tensor(cached_encodings, device=device)
-
+# cached_encodings_tensors = torch.tensor(cached_encodings, device=device)
+with open(CACHED_ENCODINGS_PATH, "rb") as f:
+    cached_encodings_tensors = torch.load(f)
 
 def get_top_k_matches(query_encoding: torch.Tensor, k: int = 10):
     with torch.inference_mode():

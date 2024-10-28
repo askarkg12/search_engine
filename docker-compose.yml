@@ -12,6 +12,8 @@ services:
       context: .
       dockerfile: server/Dockerfile  # Path to the Dockerfile for the server service
     container_name: server-service
+    volumes:
+      - weights:weights
     ports:
       - "80:80"
 

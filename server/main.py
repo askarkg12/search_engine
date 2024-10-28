@@ -21,9 +21,7 @@ async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/search", response_class=HTMLResponse)
-async def search(request: Request, query: str = Form(...)):
+@app.get("/search")
+async def search(query: str):
     results = process_query(query)
-    return templates.TemplateResponse(
-        "index.html", {"request": request, "results": results, "query": query}
-    )
+    return {"results": results, "query": query}
