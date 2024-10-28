@@ -15,7 +15,7 @@ from pathlib import Path
 from torch.nn.functional import cosine_similarity
 
 CACHED_ENCODINGS_PATH = Path("app/weights/cached_encodings.pkl")
-TT_MODEL_PATH = Path("app/weights/tt_model.pth")
+TT_MODEL_PATH = Path("app/weights/tt_weights.pth")
 DOCS_PATH = Path("dataset/internet/all_docs")
 
 VOCAB_SIZE = 81_547
