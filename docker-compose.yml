@@ -6,6 +6,8 @@ services:
     container_name: frontend-service
     ports:
       - "8501:8501"
+    networks:
+      - app-network
 
   server:
     build:
@@ -13,11 +15,13 @@ services:
       dockerfile: server/Dockerfile  # Path to the Dockerfile for the server service
     container_name: server-service
     volumes:
-      - weights:weights
+      - /weights:/weights
     ports:
       - "80:80"
+    networks:
+      - app-network
 
 # Optional: Define any shared networks or volumes if needed
-# networks:
-#   default:
-#     name: my_network  # Define a custom network name if needed
+networks:
+  app-network:
+    driver: bridge

@@ -57,9 +57,13 @@ def get_top_k_matches(query_encoding: torch.Tensor, k: int = 10):
 
 
 def get_line_from_index(index: int):
-    with open(DOCS_PATH, "r") as f:
-        f.seek(index)
-        return f.readline()
+    with open(DOCS_PATH, "r",encoding="utf-8") as f:
+        for doc_index, line in enumerate(f):
+            if index == doc_index:
+                return line
+        return "LINE NOT FOUND"
+        #f.seek(index)
+        #return f.readline()
 
 
 def process_query(query: str):
@@ -69,3 +73,9 @@ def process_query(query: str):
     top_k_indices = get_top_k_matches(query_encoding)
 
     return [get_line_from_index(i) for i in top_k_indices]
+
+if __name__=='__main__':
+    for i in range(5):
+        print(get_line_from_index(i))
+    askar_resp = process_query('King queen')
+    same_resp = process_query('Sam')

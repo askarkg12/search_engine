@@ -10,9 +10,9 @@ query = st.text_input("Enter your search query")
 # Define a function to fetch results from the API
 def fetch_results(search_query):
     # Placeholder API URL (replace with your actual API endpoint)
-    api_url = "http://localhost:80/search"
+    api_url = "http://server/search"
     # Send a GET request with the search query as a parameter
-    response = requests.get(api_url, params={"q": search_query})
+    response = requests.get(api_url, params={"query": search_query})
     
     # Check if the request was successful
     if response.status_code == 200:
@@ -31,7 +31,7 @@ if query:
     # Display results in a list format
     if results:
         for idx, result in enumerate(results):
-            st.write(f"{idx + 1}. {result['title']}")
-            st.write(result['description'])
+            st.write(f"{idx + 1}. {result}")
+            #st.write(result['description'])
     else:
         st.write("No results found.")
