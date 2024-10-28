@@ -12,16 +12,16 @@ services:
   server:
     build:
       context: .
-      dockerfile: server/Dockerfile  # Path to the Dockerfile for the server service
+      dockerfile: server/Dockerfile
     container_name: server-service
     volumes:
-      - /weights:/weights
+      - ./weights:/workspace/weights
     ports:
       - "80:80"
     networks:
       - app-network
 
-# Optional: Define any shared networks or volumes if needed
 networks:
   app-network:
     driver: bridge
+
