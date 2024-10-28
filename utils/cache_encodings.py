@@ -28,7 +28,7 @@ if USE_WANDB:
 
     print("Pulling model")
     start_checkpoint_artifact = wandb.use_artifact(
-        "two-tower-model:latest", type="model"
+        "askarkg12-personal/two-towers-marco/two-tower-model:latest", type="model"
     )
     artifact_dir = Path(start_checkpoint_artifact.download())
     start_epoch = start_checkpoint_artifact.metadata["epoch"]
@@ -39,7 +39,7 @@ if USE_WANDB:
     model_path = artifact_dir / "model.pth"
 else:
     model_path = Path("app/weights/tt_model.pth")
-    from app.processor import vocab_size, embed_dim, encoding_dim
+    from server.processor import vocab_size, embed_dim, encoding_dim
 
 
 model = TwoTowers(
@@ -60,23 +60,23 @@ with open(DOCS_PATH, "rb") as f:
 
 early_stop_count = 0
 
-with open(DOCS_PATH, "r", encoding="utf-8") as f:
+with torch.inference_mode():
+    with open(DOCS_PATH, "r", encoding="utf-8") as f:
 
-    for chunk in tqdm(
-        chunked(f, BATCH_SIZE),
-        desc="Encoding documents",
-        total=math.ceil(total / BATCH_SIZE),
-    ):
-        doc_tokens = [tokeniser.tokenise_string(doc) for doc in chunk]
+        for chunk in tqdm(
+            chunked(f, BATCH_SIZE),
+            desc="Encoding documents",
+            total=math.ceil(total / BATCH_SIZE),
+        ):
+            doc_tokens = [tokeniser.tokenise_string(doc) for doc in chunk]
 
-        doc_encodings = model.encode_docs(doc_tokens)
+            doc_encodings = model.encode_docs(doc_tokens)
 
-        doc_encodings_list.append(doc_encodings)
+            doc_encodings_list.append(doc_encodings)
 
-        early_stop_count += 1
-        if early_stop_count > 10:
-            break
+        
 
 doc_encodings = torch.cat(doc_encodings_list, dim=0)
-
-torch.save(doc_encodings, "app/weights/doc_encodings.pth")
+aaa = Path("app/weights/doc_encodings.pth")
+aaa.parent.mkdir(exist_ok=True, parents=True)
+torch.save(doc_encodings, aaa)

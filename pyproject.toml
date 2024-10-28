@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "two-towers"
+name = "search-engine"
 version = "0.1.0"
 description = ""
-authors = ["Your Name <you@example.com>"]
+authors = ["Askar Sulaimanov <ask.sulaimanov@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -13,6 +13,8 @@ wandb = "^0.18.5"
 datasets = "^3.0.1"
 more-itertools = "^10.5.0"
 fastapi = {extras = ["standard"], version = "^0.115.3"}
+streamlit = "^1.39.0"
+faiss-cpu = "^1.9.0"
 
 
 [build-system]
