@@ -1,5 +1,13 @@
 import torch
 import pickle
+
+from pathlib import Path
+import sys
+
+root_repo = Path(__file__).parent.parent
+sys.path.append(str(root_repo))
+
+
 from model.two_towers import TwoTowers, ENCODING_DIM
 from model.w2v_model import EMBED_DIM
 from utils.tokeniser import Tokeniser

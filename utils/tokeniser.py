@@ -1,6 +1,13 @@
 import pickle
 from tqdm import tqdm
-from text_utils import preprocess_text
+
+from pathlib import Path
+import sys
+
+root_repo = Path(__file__).parent.parent
+sys.path.append(str(root_repo))
+
+from utils.text_utils import preprocess_text
 
 
 class Tokeniser:

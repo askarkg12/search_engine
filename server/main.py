@@ -2,7 +2,13 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.processor import process_query
+from pathlib import Path
+import sys
+
+root_repo = Path(__file__).parent.parent
+sys.path.append(str(root_repo))
+
+from server.processor import process_query
 
 # from model.two_towers import foo
 
@@ -15,7 +21,7 @@ async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.post("/search", response_class=HTMLResponse)
+@app.get("/search", response_class=HTMLResponse)
 async def search(request: Request, query: str = Form(...)):
     results = process_query(query)
     return templates.TemplateResponse(
