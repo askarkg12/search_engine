@@ -10,7 +10,7 @@ query = st.text_input("Enter your search query")
 # Define a function to fetch results from the API
 def fetch_results(search_query):
     # Placeholder API URL (replace with your actual API endpoint)
-    api_url = "https://api.example.com/search"
+    api_url = "http://0.0.0.0/search"
     # Send a GET request with the search query as a parameter
     response = requests.get(api_url, params={"q": search_query})
     
