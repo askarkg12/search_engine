@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Basic Search Engine</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        form {
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Search</h1>
+    <form action="/search" method="post">
+        <input type="text" name="query" placeholder="Enter your search query" value="{{ query | default('') }}"
+            required>
+        <button type="submit">Search</button>
+    </form>
+    {% if results %}
+    <h2>Results:</h2>
+    <ul>
+        {% for result in results %}
+        <li>{{ result }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</body>
+
+</html>
