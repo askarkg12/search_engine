@@ -16,7 +16,7 @@ from model.two_towers_modular import TwoTowers
 
 BATCH_SIZE = 1024
 
-W2V_EMBED_PATH = root_dir / "weights/w2v_embeddings.pth"
+W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
 
 DATASET_FILEPATH = root_dir / "dataset/two_tower"
 
