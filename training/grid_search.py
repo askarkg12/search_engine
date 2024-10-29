@@ -137,3 +137,5 @@ for config in MODEL_CONFIGS:
                 "val_neg_dist": sum(val_neg_dist_list) / len(val_neg_dist_list),
             }
         )
+
+    wandb.finish()
