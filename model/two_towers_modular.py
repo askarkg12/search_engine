@@ -17,13 +17,15 @@ Sequence: TypeAlias = list[Token]
 class TwoTowers(nn.Module):
     def __init__(
         self,
-        vocab_size,
-        token_embed_dims,
-        encoded_dim,
-        rnn_layer_num=1,
-        use_gensim=False,
+        token_embed_dims: int,
+        encoded_dim: int,
+        use_gensim: bool = False,
+        vocab_size: int = 81_547,
         tokeniser: Tokeniser | None = None,
-        margin=1.0,
+        margin: float = 1.0,
+        embed_layer_weights: torch.Tensor | None = None,
+        freeze_embed_layer: bool = False,
+        rnn_layer_num: int = 1,
     ):
         super().__init__()
         self.use_gensim = use_gensim
@@ -53,9 +55,14 @@ class TwoTowers(nn.Module):
             if tokeniser is None:
                 raise ValueError("tokeniser must be provided if use_gensim is False")
             self.tokeniser = tokeniser
-            self.embed_layer = nn.Embedding(
-                num_embeddings=vocab_size, embedding_dim=self.token_embed_dims
-            )
+            if embed_layer_weights is None:
+                self.embed_layer = nn.Embedding(
+                    num_embeddings=vocab_size, embedding_dim=self.token_embed_dims
+                )
+            else:
+                self.embed_layer = nn.Embedding.from_pretrained(
+                    embed_layer_weights, freeze=freeze_embed_layer
+                )
 
             def embed_locally_trained(text: str) -> torch.Tensor:
                 # Returns list of vectors, shape [L, E]
