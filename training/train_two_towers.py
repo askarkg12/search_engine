@@ -17,13 +17,15 @@ from utils.two_tower_dataset import TwoTowerDataset, collate_fn
 device = "cuda" if torch.cuda.is_available() else "cpu"
 map_location = torch.device(device)
 
-BATCH_SIZE = 10_000
+BATCH_SIZE = 1_000
 
-two_tower_project = "two-towers-marco"
+two_tower_project = "search-towers"
 wandb.init(project=two_tower_project)
 
 print("Pulling model")
-start_checkpoint_artifact = wandb.use_artifact("two-tower-model:latest", type="model")
+start_checkpoint_artifact = wandb.use_artifact(
+    "askarkg12-personal/two-towers-marco/two-tower-model:v23", type="model"
+)
 artifact_dir = Path(start_checkpoint_artifact.download())
 start_epoch = start_checkpoint_artifact.metadata["epoch"]
 vocab_size = start_checkpoint_artifact.metadata["vocab_size"]
@@ -42,9 +44,13 @@ print("Model pulled")
 optimizer = optim.Adam(model.parameters(), lr=0.005)
 
 print("Loading dataset")
-dataset_path = Path("dataset/two_tower/train")
-with open(dataset_path, "rb") as f:
-    data = pickle.load(f)
+train_dataset_path = Path("dataset/two_tower/train")
+with open(train_dataset_path, "rb") as f:
+    train_data = pickle.load(f)
+
+val_dataset_path = Path("dataset/two_tower/validation")
+with open(val_dataset_path, "rb") as f:
+    val_data = pickle.load(f)
 print("Loaded dataset")
 
 # dataset = TwoTowerDataset(data)
@@ -53,18 +59,77 @@ print("Loaded dataset")
 # )
 print("Dataset loader ready")
 
-num_batches = math.ceil(len(data) / BATCH_SIZE)
+num_batches = math.ceil(len(train_data) / BATCH_SIZE)
+val_num_batches = math.ceil(len(val_data) / BATCH_SIZE)
 
 for epoch in range(start_epoch + 1, start_epoch + 501):
-    batches = more_itertools.chunked(data, BATCH_SIZE)
+    # Training
+    batches = more_itertools.chunked(train_data, BATCH_SIZE)
     prgs = tqdm(batches, desc=f"Epoch {epoch}", total=num_batches)
+    model.train()
+    train_losses = []
+    train_pos_distances = []
+    train_neg_distances = []
     for batch in prgs:
         queries, pos, negs = zip(*batch)
-        loss: torch.Tensor = model.get_loss_batch(queries, pos, negs)
+        loss, pos_distance, neg_distance = model.get_loss_batch_with_distances(
+            queries, pos, negs
+        )
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        wandb.log({"loss": loss.item()})
+        wandb.log({"train_loss": loss.item()})
+        train_losses.append(loss.item())
+        train_pos_distances.append(pos_distance.item())
+        train_neg_distances.append(neg_distance.item())
+    wandb.log({"train_loss_epoch": sum(train_losses) / len(train_losses)})
+    wandb.log(
+        {
+            "train_pos_distance_epoch": sum(train_pos_distances)
+            / len(train_pos_distances)
+        }
+    )
+    wandb.log(
+        {
+            "train_neg_distance_epoch": sum(train_neg_distances)
+            / len(train_neg_distances)
+        }
+    )
+
+    # Tracking validatoin loss
+    model.eval()
+    val_batches = more_itertools.chunked(val_data, BATCH_SIZE)
+    val_prgs = tqdm(val_batches, desc=f"Val epoch {epoch}", total=val_num_batches)
+    val_losses = []
+
+    pos_distances = []
+    neg_distances = []
+    with torch.inference_mode():
+        for batch in val_prgs:
+            queries, pos, negs = zip(*batch)
+            loss, pos_distance, neg_distance = model.get_loss_batch_with_distances(
+                queries, pos, negs
+            )
+            pos_distances.append(pos_distance.item())
+            neg_distances.append(neg_distance.item())
+            val_losses.append(loss.item())
+    wandb.log({"val_loss_epoch": sum(val_losses) / len(val_losses)})
+    wandb.log({"val_pos_distance_epoch": sum(pos_distances) / len(pos_distances)})
+    wandb.log({"val_neg_distance_epoch": sum(neg_distances) / len(neg_distances)})
+
+    # Track accuracy cheap
+    if not epoch % 10:
+        # For each batch of query, pos and neg
+        # Take cos_sim between query and pos
+        # If cos_sim > threshold, count as correct
+        pass
+
+    # Tracking accuracy expensive
+    if not epoch % 10:
+        # Recache all doc encodings
+
+        pass
+    # Save checkpoint
     if not (epoch + 1) % 5:
         checkpoint_path = Path("artifacts/two-tower-model/model.pth")
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
