@@ -6,6 +6,12 @@ import gensim.downloader as gs_api
 device = "cuda" if torch.cuda.is_available() else "cpu"
 map_location = torch.device(device)
 
+from pathlib import Path
+import sys
+
+root_dir = Path(__file__).parent.parent
+sys.path.append(str(root_dir))
+
 from utils.tokeniser import Tokeniser
 
 from typing import TypeAlias
@@ -58,11 +64,11 @@ class TwoTowers(nn.Module):
             if embed_layer_weights is None:
                 self.embed_layer = nn.Embedding(
                     num_embeddings=vocab_size, embedding_dim=self.token_embed_dims
-                )
+                ).to(device)
             else:
                 self.embed_layer = nn.Embedding.from_pretrained(
                     embed_layer_weights, freeze=freeze_embed_layer
-                )
+                ).to(device)
 
             def embed_locally_trained(text: str) -> torch.Tensor:
                 # Returns list of vectors, shape [L, E]
@@ -119,13 +125,21 @@ class TwoTowers(nn.Module):
         return triplet_loss.mean(), (pos_dist.mean(), neg_dist.mean())
 
     def encode_sequences(self, sequences: list[list[int]], encoder: nn.LSTM):
-        seq_lens = torch.tensor([len(seq) for seq in sequences], dtype=torch.long)
-
         # Shape [N, Lrand, E]
         seq_embed_list = [self.embed_text(seq) for seq in sequences]
 
+        # Keep sequence lengths tensor on CPU
+        seq_lens = torch.tensor(
+            [seq_embed.shape[0] for seq_embed in seq_embed_list],
+            dtype=torch.long,
+            device="cpu",
+        )
+
+        # Ensure encoder is on the correct device
+        encoder = encoder.cpu()
+
         # Shape [N, Lmax, E]
-        padded_seq_embeds = pad_sequence(seq_embed_list, batch_first=True)
+        padded_seq_embeds = pad_sequence(seq_embed_list, batch_first=True).cpu()
 
         packed_padded_seqs = pack_padded_sequence(
             padded_seq_embeds, seq_lens, batch_first=True, enforce_sorted=False
@@ -162,4 +176,6 @@ class TwoTowers(nn.Module):
 
 
 if __name__ == "__main__":
+    model = TwoTowers(token_embed_dims=300, encoded_dim=300, use_gensim=True)
+    torch.save(model.state_dict(), root_dir / "model/weights/two_towers_gensim.pth")
     pass

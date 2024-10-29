@@ -8,11 +8,13 @@ import wandb
 import more_itertools
 import math
 
-root_dir = Path(__file__).parent.parent
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+root_dir = Path(__file__).parent.parent
 sys.path.append(str(root_dir))
 
 from model.two_towers_modular import TwoTowers
+from utils.tokeniser import Tokeniser
 
 BATCH_SIZE = 1024
 
@@ -32,7 +34,7 @@ with open(VALIDATION_FILEPATH, "rb") as f:
 total_train_len = math.ceil(len(train_data) / BATCH_SIZE)
 total_val_len = math.ceil(len(validation_data) / BATCH_SIZE)
 
-EPOCHS = 10
+EPOCHS = 2
 
 MODEL_CONFIGS = [
     {
@@ -59,7 +61,7 @@ MODEL_CONFIGS = [
     {"run_name": "gensim", "use_gensim": True, "optimizer": "adam", "lr": 0.001},
 ]
 
-
+tokeniser = Tokeniser()
 for config in MODEL_CONFIGS:
     run_name = config["run_name"]
     use_gensim = config["use_gensim"]
@@ -72,7 +74,8 @@ for config in MODEL_CONFIGS:
         encoded_dim=encoded_dim,
         use_gensim=use_gensim,
         embed_layer_weights=torch.load(W2V_EMBED_PATH, weights_only=True),
-    )
+        tokeniser=tokeniser,
+    ).to(device)
 
     if optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -95,7 +98,8 @@ for config in MODEL_CONFIGS:
             loss: torch.Tensor
             pos_dist: torch.Tensor
             neg_dist: torch.Tensor
-            loss, (pos_dist, neg_dist) = model.get_loss_batch(batch)
+            query, pos_samples, neg_samples = zip(*batch)
+            loss, (pos_dist, neg_dist) = model.get_loss_batch(query, pos_samples, neg_samples)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
