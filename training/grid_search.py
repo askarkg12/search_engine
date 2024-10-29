@@ -71,6 +71,7 @@ for config in MODEL_CONFIGS:
         token_embed_dims=300 if use_gensim else 50,
         encoded_dim=encoded_dim,
         use_gensim=use_gensim,
+        embed_layer_weights=torch.load(W2V_EMBED_PATH, weights_only=True),
     )
 
     if optimizer == "adam":
