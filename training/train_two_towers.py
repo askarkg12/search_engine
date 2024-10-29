@@ -17,7 +17,7 @@ from utils.two_tower_dataset import TwoTowerDataset, collate_fn
 device = "cuda" if torch.cuda.is_available() else "cpu"
 map_location = torch.device(device)
 
-BATCH_SIZE = 5_000
+BATCH_SIZE = 1_000
 
 two_tower_project = "search-towers"
 wandb.init(project=two_tower_project)
@@ -48,7 +48,7 @@ train_dataset_path = Path("dataset/two_tower/train")
 with open(train_dataset_path, "rb") as f:
     train_data = pickle.load(f)
 
-val_dataset_path = Path("dataset/two_tower/train")
+val_dataset_path = Path("dataset/two_tower/validation")
 with open(val_dataset_path, "rb") as f:
     val_data = pickle.load(f)
 print("Loaded dataset")
@@ -60,6 +60,7 @@ print("Loaded dataset")
 print("Dataset loader ready")
 
 num_batches = math.ceil(len(train_data) / BATCH_SIZE)
+val_num_batches = math.ceil(len(val_data) / BATCH_SIZE)
 
 for epoch in range(start_epoch + 1, start_epoch + 501):
     # Training
@@ -67,31 +68,50 @@ for epoch in range(start_epoch + 1, start_epoch + 501):
     prgs = tqdm(batches, desc=f"Epoch {epoch}", total=num_batches)
     model.train()
     train_losses = []
+    train_pos_distances = []
+    train_neg_distances = []
     for batch in prgs:
         queries, pos, negs = zip(*batch)
-        loss: torch.Tensor = model.get_loss_batch(queries, pos, negs)
+        loss, pos_distance, neg_distance = model.get_loss_batch_with_distances(
+            queries, pos, negs
+        )
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         wandb.log({"train_loss": loss.item()})
         train_losses.append(loss.item())
+        train_pos_distances.append(pos_distance.item())
+        train_neg_distances.append(neg_distance.item())
     wandb.log({"train_loss_epoch": sum(train_losses) / len(train_losses)})
+    wandb.log(
+        {
+            "train_pos_distance_epoch": sum(train_pos_distances)
+            / len(train_pos_distances)
+        }
+    )
+    wandb.log(
+        {
+            "train_neg_distance_epoch": sum(train_neg_distances)
+            / len(train_neg_distances)
+        }
+    )
 
     # Tracking validatoin loss
     model.eval()
     val_batches = more_itertools.chunked(val_data, BATCH_SIZE)
+    val_prgs = tqdm(val_batches, desc=f"Val epoch {epoch}", total=val_num_batches)
     val_losses = []
 
     pos_distances = []
     neg_distances = []
     with torch.inference_mode():
-        for batch in val_batches:
+        for batch in val_prgs:
             queries, pos, negs = zip(*batch)
             loss, pos_distance, neg_distance = model.get_loss_batch_with_distances(
                 queries, pos, negs
             )
-            pos_distances.append(pos_distance)
-            neg_distances.append(neg_distance)
+            pos_distances.append(pos_distance.item())
+            neg_distances.append(neg_distance.item())
             val_losses.append(loss.item())
     wandb.log({"val_loss_epoch": sum(val_losses) / len(val_losses)})
     wandb.log({"val_pos_distance_epoch": sum(pos_distances) / len(pos_distances)})
