@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 import gensim.downloader as gs_api
+from gensim.models import KeyedVectors
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 map_location = torch.device(device)
@@ -20,68 +21,66 @@ Token: TypeAlias = int
 Sequence: TypeAlias = list[Token]
 
 
+class GensimEmbeddings(nn.Module):
+    def __init__(self):
+        super().__init__()
+        w2v: KeyedVectors = gs_api.load("word2vec-google-news-300")
+        self.embeddings = w2v.vectors
+
+    def forward(self, tokens: list[int]) -> torch.Tensor:
+        return torch.tensor(
+            [self.embeddings[token] for token in tokens],
+            dtype=torch.float,
+            device=device,
+        )
+
+
+class GensimEmbddingIntegrated(nn.Module):
+    def __init__(self):
+        super().__init__()
+        w2v = gs_api.load("word2vec-google-news-300")
+        embeddings = w2v.vectors
+        self.embed_layer = nn.Embedding.from_pretrained(
+            torch.from_numpy(embeddings), freeze=False
+        ).to(device)
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        return self.embed_layer(tokens)
+
+
 class TwoTowers(nn.Module):
     def __init__(
         self,
         token_embed_dims: int,
         encoded_dim: int,
         use_gensim: bool = False,
+        integrate_gensim: bool = False,
         vocab_size: int = 81_547,
-        tokeniser: Tokeniser | None = None,
         margin: float = 1.0,
         embed_layer_weights: torch.Tensor | None = None,
         freeze_embed_layer: bool = False,
         rnn_layer_num: int = 1,
     ):
         super().__init__()
-        self.use_gensim = use_gensim
+        self.embedder_is_external = use_gensim and not integrate_gensim
         self.margin = margin
+
+        # Embedding layer can be external or internal
         if use_gensim:
-            self.token_embed_dims = 300
-            self.embed_layer = gs_api.load("word2vec-google-news-300")
-
-            def embed_gensim(text: str) -> torch.Tensor:
-                # Returns list of vectors, shape [L, E]
-                return torch.tensor(
-                    [
-                        (
-                            self.embed_layer[word]
-                            if word in self.embed_layer
-                            else torch.zeros(300)
-                        )
-                        for word in text
-                    ],
-                    dtype=torch.float,
-                    device=device,
-                )
-
-            self.embed_text = embed_gensim
+            if integrate_gensim:
+                # NOTE This takes will be a very big tensor to save
+                self.embed_layer = GensimEmbddingIntegrated()
+            else:
+                self.embed_layer = GensimEmbeddings()
         else:
-            self.token_embed_dims = token_embed_dims
-            if tokeniser is None:
-                raise ValueError("tokeniser must be provided if use_gensim is False")
-            self.tokeniser = tokeniser
             if embed_layer_weights is None:
                 self.embed_layer = nn.Embedding(
-                    num_embeddings=vocab_size, embedding_dim=self.token_embed_dims
+                    num_embeddings=vocab_size, embedding_dim=token_embed_dims
                 ).to(device)
             else:
                 self.embed_layer = nn.Embedding.from_pretrained(
                     embed_layer_weights, freeze=freeze_embed_layer
                 ).to(device)
-
-            def embed_locally_trained(text: str) -> torch.Tensor:
-                # Returns list of vectors, shape [L, E]
-                return self.embed_layer(
-                    # Returns list of ints, shape [L]
-                    torch.tensor(
-                        self.tokeniser.tokenise_string(text),
-                        dtype=torch.long,
-                        device=device,
-                    )
-                )
-
-            self.embed_text = embed_locally_trained
 
         self.query_encoder = nn.LSTM(
             input_size=token_embed_dims,
@@ -124,9 +123,15 @@ class TwoTowers(nn.Module):
 
         return triplet_loss.mean(), (pos_dist.mean(), neg_dist.mean())
 
-    def encode_sequences(self, sequences: list[list[int]], encoder: nn.LSTM):
+    def encode_sequences(self, sequences: list[Sequence], encoder: nn.LSTM):
         # Shape [N, Lrand, E]
-        seq_embed_list = [self.embed_text(seq) for seq in sequences]
+        if self.embedder_is_external:
+            seq_embed_list = [self.embed_layer(seq) for seq in sequences]
+        else:
+            seq_embed_list = [
+                self.embed_layer(torch.tensor(seq, dtype=torch.long, device=device))
+                for seq in sequences
+            ]
 
         # Keep sequence lengths tensor on CPU
         seq_lens = torch.tensor(
