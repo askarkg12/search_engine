@@ -15,7 +15,7 @@ COPY ./server ./server
 COPY ./model ./model
 # COPY ./weights ./weights
 COPY ./utils ./utils
-COPY ./dataset/internet ./dataset/internet
+COPY ./dataset ./dataset
 
 
 CMD ["fastapi", "run", "server/main.py", "--port", "8501"]
