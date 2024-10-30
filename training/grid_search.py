@@ -22,16 +22,16 @@ from training.performance_eval import (
     build_doc_faiss_index,
 )
 
-BATCH_SIZE = 1024
+BATCH_SIZE = 500
 
-PERFORMANCE_EVAL_EVERY_N_EPOCHS = 2
+PERFORMANCE_EVAL_EVERY_N_EPOCHS = 4
 
 
 W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
 
 DATASET_FILEPATH = root_dir / "dataset/two_tower/prep"
 
-USE_MINI_DATASET = True
+USE_MINI_DATASET = False
 
 mini_option = "_mini" if USE_MINI_DATASET else ""
 
@@ -45,22 +45,36 @@ LOCAL_VALIDATION_FILEPATH = (
 )
 
 
-EPOCHS = 10
+EPOCHS = 20
 
 MODEL_CONFIGS = [
     {
-        "run_name": "no_gensim_50",
-        "use_gensim": False,
-        "encoded_dim": 50,
+        "run_name": "gensim_200",
+        "use_gensim": True,
         "optimizer": "adam",
         "lr": 0.001,
+        "encoded_dim": 200,
     },
     {
-        "run_name": "no_gensim_100",
-        "use_gensim": False,
-        "encoded_dim": 100,
+        "run_name": "gensim_300",
+        "use_gensim": True,
         "optimizer": "adam",
         "lr": 0.001,
+        "encoded_dim": 300,
+    },
+    {
+        "run_name": "gensim_400",
+        "use_gensim": True,
+        "optimizer": "adam",
+        "lr": 0.001,
+        "encoded_dim": 400,
+    },
+    {
+        "run_name": "gensim_500",
+        "use_gensim": True,
+        "optimizer": "adam",
+        "lr": 0.001,
+        "encoded_dim": 500,
     },
     {
         "run_name": "no_gensim_200",
@@ -69,13 +83,12 @@ MODEL_CONFIGS = [
         "optimizer": "adam",
         "lr": 0.001,
     },
-    {"run_name": "gensim", "use_gensim": True, "optimizer": "adam", "lr": 0.001},
 ]
 
 for config in MODEL_CONFIGS:
     run_name = config["run_name"]
     use_gensim = config["use_gensim"]
-    encoded_dim = config["encoded_dim"] if not use_gensim else 300
+    encoded_dim = config["encoded_dim"]
     optimizer = config["optimizer"]
     lr = config["lr"]
 
@@ -101,14 +114,17 @@ for config in MODEL_CONFIGS:
 
     tokeniser = Tokeniser(use_gensim=use_gensim)
 
-    model = TwoTowers(
-        encoded_dim=encoded_dim,
-        use_gensim=use_gensim,
-        token_embed_dims=300 if use_gensim else 50,
-        embed_layer_weights=(
-            torch.load(W2V_EMBED_PATH, weights_only=True) if not use_gensim else None
-        ),
-    ).to(device)
+    with task(f"Initialising {run_name} model"):
+        model = TwoTowers(
+            encoded_dim=encoded_dim,
+            use_gensim=use_gensim,
+            token_embed_dims=300 if use_gensim else 50,
+            embed_layer_weights=(
+                torch.load(W2V_EMBED_PATH, weights_only=True)
+                if not use_gensim
+                else None
+            ),
+        ).to(device)
 
     if optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -145,14 +161,6 @@ for config in MODEL_CONFIGS:
             pos_dist_list.append(pos_dist.item())
             neg_dist_list.append(neg_dist.item())
 
-        wandb.log(
-            {
-                "train_loss": sum(loss_list) / len(loss_list),
-                "train_pos_dist": sum(pos_dist_list) / len(pos_dist_list),
-                "train_neg_dist": sum(neg_dist_list) / len(neg_dist_list),
-            }
-        )
-
         # Validation
         model.eval()
         validation_chunks = more_itertools.chunked(validation_data, BATCH_SIZE)
@@ -176,6 +184,9 @@ for config in MODEL_CONFIGS:
 
         wandb.log(
             {
+                "train_loss": sum(loss_list) / len(loss_list),
+                "train_pos_dist": sum(pos_dist_list) / len(pos_dist_list),
+                "train_neg_dist": sum(neg_dist_list) / len(neg_dist_list),
                 "val_loss": sum(val_loss_list) / len(val_loss_list),
                 "val_pos_dist": sum(val_pos_dist_list) / len(val_pos_dist_list),
                 "val_neg_dist": sum(val_neg_dist_list) / len(val_neg_dist_list),
@@ -189,14 +200,14 @@ for config in MODEL_CONFIGS:
             train_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["train"][:500],
+                dataset_split=hg_dataset["train"][:1000],
                 faiss_index=faiss_index,
             )
 
             val_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["validation"][:500],
+                dataset_split=hg_dataset["validation"][:1000],
                 faiss_index=faiss_index,
             )
             wandb.log(
