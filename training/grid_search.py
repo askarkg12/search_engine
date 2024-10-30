@@ -49,27 +49,6 @@ EPOCHS = 30
 
 MODEL_CONFIGS = [
     {
-        "run_name": "no_gensim_200",
-        "use_gensim": False,
-        "encoded_dim": 200,
-        "optimizer": "adam",
-        "lr": 0.001,
-    },
-    {
-        "run_name": "no_gensim_300",
-        "use_gensim": False,
-        "encoded_dim": 300,
-        "optimizer": "adam",
-        "lr": 0.001,
-    },
-    {
-        "run_name": "no_gensim_400",
-        "use_gensim": False,
-        "encoded_dim": 400,
-        "optimizer": "adam",
-        "lr": 0.001,
-    },
-    {
         "run_name": "gensim_300",
         "use_gensim": True,
         "optimizer": "adam",
@@ -89,6 +68,27 @@ MODEL_CONFIGS = [
         "optimizer": "adam",
         "lr": 0.001,
         "encoded_dim": 500,
+    },
+    {
+        "run_name": "no_gensim_200",
+        "use_gensim": False,
+        "encoded_dim": 200,
+        "optimizer": "adam",
+        "lr": 0.001,
+    },
+    {
+        "run_name": "no_gensim_300",
+        "use_gensim": False,
+        "encoded_dim": 300,
+        "optimizer": "adam",
+        "lr": 0.001,
+    },
+    {
+        "run_name": "no_gensim_400",
+        "use_gensim": False,
+        "encoded_dim": 400,
+        "optimizer": "adam",
+        "lr": 0.001,
     },
 ]
 
@@ -198,8 +198,8 @@ for config in MODEL_CONFIGS:
                 "val_loss": sum(val_loss_list) / len(val_loss_list),
                 "val_pos_dist": sum(val_pos_dist_list) / len(val_pos_dist_list),
                 "val_neg_dist": sum(val_neg_dist_list) / len(val_neg_dist_list),
+                "epoch": epoch,
             },
-            step=epoch,
         )
 
         if not epoch % PERFORMANCE_EVAL_EVERY_N_EPOCHS:
@@ -223,7 +223,7 @@ for config in MODEL_CONFIGS:
                 {
                     "train_eval_score": float(train_score),
                     "val_eval_score": float(val_score),
+                    "epoch": epoch,
                 },
-                step=epoch,
             )
     wandb.finish()
