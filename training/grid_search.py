@@ -22,7 +22,7 @@ from training.performance_eval import (
     build_doc_faiss_index,
 )
 
-BATCH_SIZE = 500
+BATCH_SIZE = 1024
 
 PERFORMANCE_EVAL_EVERY_N_EPOCHS = 4
 
@@ -86,7 +86,7 @@ MODEL_CONFIGS = [
 ]
 
 for config in MODEL_CONFIGS:
-    run_name = config["run_name"]
+    run_name = config["run_name"] + mini_option
     use_gensim = config["use_gensim"]
     encoded_dim = config["encoded_dim"]
     optimizer = config["optimizer"]
@@ -132,7 +132,7 @@ for config in MODEL_CONFIGS:
     else:
         raise ValueError(f"Unknown optimizer: {optimizer}")
 
-    wandb.init(project="two_tower_grid_search", name=run_name, config=config)
+    wandb.init(project="two_tower_grid_search_epochs", name=run_name, config=config)
 
     for epoch in range(1, EPOCHS + 1):
         # Train
@@ -191,7 +191,8 @@ for config in MODEL_CONFIGS:
                 "val_loss": sum(val_loss_list) / len(val_loss_list),
                 "val_pos_dist": sum(val_pos_dist_list) / len(val_pos_dist_list),
                 "val_neg_dist": sum(val_neg_dist_list) / len(val_neg_dist_list),
-            }
+            },
+            step=epoch,
         )
 
         if not epoch % PERFORMANCE_EVAL_EVERY_N_EPOCHS:
@@ -201,20 +202,21 @@ for config in MODEL_CONFIGS:
             train_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["train"][:1000],
+                dataset_split=hg_dataset["train"][:100],
                 faiss_index=faiss_index,
             )
 
             val_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["validation"][:1000],
+                dataset_split=hg_dataset["validation"][:100],
                 faiss_index=faiss_index,
             )
             wandb.log(
                 {
                     "train_eval_score": float(train_score),
                     "val_eval_score": float(val_score),
-                }
+                },
+                step=epoch,
             )
     wandb.finish()
