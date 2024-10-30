@@ -3,3 +3,7 @@ tqdm
 wandb
 datasets
 more-itertools
+fastapi[standard]
+streamlit
+faiss-cpu
+gensim
