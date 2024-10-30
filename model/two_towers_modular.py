@@ -19,33 +19,7 @@ from typing import TypeAlias
 
 Token: TypeAlias = int
 Sequence: TypeAlias = list[Token]
-
-
-class GensimEmbeddings(nn.Module):
-    def __init__(self):
-        super().__init__()
-        w2v: KeyedVectors = gs_api.load("word2vec-google-news-300")
-        self.embeddings = w2v.vectors
-
-    def forward(self, tokens: list[int]) -> torch.Tensor:
-        return torch.tensor(
-            [self.embeddings[token] for token in tokens],
-            dtype=torch.float,
-            device=device,
-        )
-
-
-class GensimEmbddingIntegrated(nn.Module):
-    def __init__(self):
-        super().__init__()
-        w2v = gs_api.load("word2vec-google-news-300")
-        embeddings = w2v.vectors
-        self.embed_layer = nn.Embedding.from_pretrained(
-            torch.from_numpy(embeddings), freeze=False
-        ).to(device)
-
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
-        return self.embed_layer(tokens)
+SequenceTensor: TypeAlias = torch.Tensor
 
 
 class TwoTowers(nn.Module):
@@ -54,7 +28,7 @@ class TwoTowers(nn.Module):
         token_embed_dims: int,
         encoded_dim: int,
         use_gensim: bool = False,
-        integrate_gensim: bool = False,
+        freeze_embeds: bool = False,
         vocab_size: int = 81_547,
         margin: float = 1.0,
         embed_layer_weights: torch.Tensor | None = None,
@@ -62,16 +36,21 @@ class TwoTowers(nn.Module):
         rnn_layer_num: int = 1,
     ):
         super().__init__()
-        self.embedder_is_external = use_gensim and not integrate_gensim
         self.margin = margin
 
         # Embedding layer can be external or internal
         if use_gensim:
-            if integrate_gensim:
+            w2v: KeyedVectors = gs_api.load("word2vec-google-news-300")
+            embeddings = w2v.vectors
+            if freeze_embeds:
                 # NOTE This takes will be a very big tensor to save
-                self.embed_layer = GensimEmbddingIntegrated()
+                self.embed_layer = nn.Embedding.from_pretrained(
+                    torch.from_numpy(embeddings), freeze=True
+                ).to(device)
             else:
-                self.embed_layer = GensimEmbeddings()
+                self.embed_layer = nn.Embedding.from_pretrained(
+                    torch.from_numpy(embeddings), freeze=False
+                ).to(device)
         else:
             if embed_layer_weights is None:
                 self.embed_layer = nn.Embedding(
@@ -123,36 +102,30 @@ class TwoTowers(nn.Module):
 
         return triplet_loss.mean(), (pos_dist.mean(), neg_dist.mean())
 
-    def encode_sequences(self, sequences: list[Sequence], encoder: nn.LSTM):
-        # Shape [N, Lrand, E]
-        if self.embedder_is_external:
-            seq_embed_list = [self.embed_layer(seq) for seq in sequences]
-        else:
-            seq_embed_list = [
-                self.embed_layer(torch.tensor(seq, dtype=torch.long, device=device))
-                for seq in sequences
-            ]
+    def encode_sequences(self, token_sequences: list[SequenceTensor], encoder: nn.LSTM):
+        # Shape [N, Lrand] at the start
 
-        # Keep sequence lengths tensor on CPU
+        # Shape [N]
         seq_lens = torch.tensor(
-            [seq_embed.shape[0] for seq_embed in seq_embed_list],
+            [seq.shape[0] for seq in token_sequences],
             dtype=torch.long,
             device="cpu",
         )
 
-        # Ensure encoder is on the correct device
-        encoder = encoder.cpu()
+        # Shape [N, Lmax]
+        padded_seq_tkns = pad_sequence(token_sequences, batch_first=True)
 
         # Shape [N, Lmax, E]
-        padded_seq_embeds = pad_sequence(seq_embed_list, batch_first=True).cpu()
+        padded_seq_embeds = self.embed_layer(padded_seq_tkns)
 
-        packed_padded_seqs = pack_padded_sequence(
+        # Shape [N, Lmax, E]
+        packed_padded_seq_embeds = pack_padded_sequence(
             padded_seq_embeds, seq_lens, batch_first=True, enforce_sorted=False
         )
 
         bi_seq_encodings: torch.Tensor
         # Shape [2, N, H]
-        _, (bi_seq_encodings, _) = encoder(packed_padded_seqs)
+        _, (bi_seq_encodings, _) = encoder(packed_padded_seq_embeds)
 
         batch_len = bi_seq_encodings.shape[1]
 

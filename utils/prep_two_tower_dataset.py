@@ -6,6 +6,10 @@ from tokeniser import Tokeniser
 from random import randrange
 import sys
 
+SAVE_AS_TENSORS = True
+if SAVE_AS_TENSORS:
+    import torch
+
 root_dir = Path(__file__).parent.parent
 sys.path.append(str(root_dir))
 
@@ -14,8 +18,8 @@ from rich_utils import task
 DATASET_FILEPATH = Path("dataset/two_tower")
 DATASET_FILEPATH.mkdir(parents=True, exist_ok=True)
 
-# TOKENISER = "gensim"
-TOKENISER = "local"
+TOKENISER = "gensim"
+# TOKENISER = "local"
 
 
 if __name__ == "__main__":
@@ -41,7 +45,7 @@ if __name__ == "__main__":
 
     for split in splits:
         split_data = []
-
+        split_data_tensors = []
         rows = tqdm(
             enumerate(dataset[split]),
             total=dataset[split].num_rows,
@@ -58,7 +62,17 @@ if __name__ == "__main__":
                 )
                 for sample in pos_samples
             ]
-            split_data.extend(data)
+            if SAVE_AS_TENSORS:
+                data_tensors = [
+                    (torch.tensor(query), torch.tensor(pos), torch.tensor(neg))
+                    for query, pos, neg in data
+                ]
 
+            split_data.extend(data)
+            split_data_tensors.extend(data_tensors)
         with open(DATASET_FILEPATH / f"{split}_{TOKENISER}.pkl", "wb") as f:
             pickle.dump(split_data, f)
+
+        if SAVE_AS_TENSORS:
+            with open(DATASET_FILEPATH / f"{split}_{TOKENISER}_tensors.pkl", "wb") as f:
+                pickle.dump(split_data_tensors, f)
