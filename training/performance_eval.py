@@ -18,7 +18,7 @@ from model.two_towers_modular import TwoTowers
 dataset = datasets.load_dataset("imdb")
 
 ALL_DOCS_PATH = root_dir / "dataset" / "two_tower" / "all_docs.txt"
-BATCH_SIZE = 100
+BATCH_SIZE = 1024
 
 RANK_CUTOFF = 100
 
@@ -34,10 +34,9 @@ with open(ALL_DOCS_PATH, "r", encoding="utf-8") as f:
         index_to_doc[index] = line
         doc_to_index[line] = index
 
-all_doc_encodings_list: list[np.ndarray] = []
-
 
 def build_doc_faiss_index(model: TwoTowers, tokeniser: Tokeniser) -> float:
+    all_doc_encodings_list: list[np.ndarray] = []
     # Build doc faiss index
     with torch.inference_mode():
         with open(ALL_DOCS_PATH, "r") as f:
@@ -46,9 +45,11 @@ def build_doc_faiss_index(model: TwoTowers, tokeniser: Tokeniser) -> float:
                 desc="Encoding documents",
                 total=math.ceil(total_docs_count / BATCH_SIZE),
             ):
-                doc_tokens = [tokeniser.tokenise_string(doc) for doc in chunk]
+                doc_tokens = [
+                    torch.tensor(tokeniser.tokenise_string(doc)) for doc in chunk
+                ]
 
-                doc_encodings = model.encode_docs(doc_tokens).detach().numpy()
+                doc_encodings = model.encode_docs(doc_tokens).detach().cpu().numpy()
 
                 all_doc_encodings_list.append(doc_encodings)
 
@@ -65,21 +66,31 @@ def evaluate_performance_two_towers(
     faiss_index: faiss.IndexFlatIP,
 ) -> float:
 
-    for i, row in enumerate(dataset_split):
-        query = row["text"]
+    keys_of_interest = ["query", "passages"]
+    zipped_dataset_split = [
+        dict(zip(keys_of_interest, items))
+        for items in zip(*(dataset_split[key] for key in keys_of_interest))
+    ]
+    all_scores = []
+    for row in tqdm(zipped_dataset_split, desc="Evaluating performance"):
+        query = row["query"]
 
         pos_docs = row["passages"]["passage_text"]
-        pos_doc_indices = [doc_to_index[doc] for doc in pos_docs]
+        # TODO Newline should be in the index
+        pos_doc_indices = [doc_to_index[doc + "\n"] for doc in pos_docs]
 
-        query_tokens = tokeniser.tokenise_string(query)
-        query_encoding = model(query_tokens)
+        query_tokens = torch.tensor(tokeniser.tokenise_string(query))
+        query_encoding_tensor: torch.Tensor = model(query_tokens).detach().cpu()
+        query_encoding = query_encoding_tensor.unsqueeze(0).numpy()
         _, pred_indices = faiss_index.search(query_encoding, RANK_CUTOFF)
 
-        all_scores = []
+        query_scores = []
         for pos_index in pos_doc_indices:
             if pos_index in pred_indices:
                 rank = np.where(pred_indices == pos_index)[0][0]
                 score = 1 - rank / RANK_CUTOFF
-                all_scores.append(score)
-
+            else:
+                score = 0
+            query_scores.append(score)
+        all_scores.append(np.mean(query_scores))
     return np.mean(all_scores)

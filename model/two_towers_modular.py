@@ -113,7 +113,7 @@ class TwoTowers(nn.Module):
         )
 
         # Shape [N, Lmax]
-        padded_seq_tkns = pad_sequence(token_sequences, batch_first=True)
+        padded_seq_tkns = pad_sequence(token_sequences, batch_first=True).to(device)
 
         # Shape [N, Lmax, E]
         padded_seq_embeds = self.embed_layer(padded_seq_tkns)
@@ -149,7 +149,7 @@ class TwoTowers(nn.Module):
         return self.encode_sequence_single(doc, self.doc_encoder)
 
     # Forward because model is used in app
-    def forward(self, query: list[int]):
+    def forward(self, query: list[int]) -> torch.Tensor:
         return self.encode_query_single(query)
 
 

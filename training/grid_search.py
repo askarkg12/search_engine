@@ -16,6 +16,7 @@ sys.path.append(str(root_dir))
 
 from model.two_towers_modular import TwoTowers
 from utils.tokeniser import Tokeniser
+from utils.rich_utils import task
 from training.performance_eval import (
     evaluate_performance_two_towers,
     build_doc_faiss_index,
@@ -23,35 +24,50 @@ from training.performance_eval import (
 
 BATCH_SIZE = 1024
 
-PERFORMANCE_EVAL_EVERY_N_EPOCHS = 10
+PERFORMANCE_EVAL_EVERY_N_EPOCHS = 5
 
 
 W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
 
-DATASET_FILEPATH = root_dir / "dataset/two_tower"
+DATASET_FILEPATH = root_dir / "dataset/two_tower/prep"
 
-GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / "train_gensim_tensors.pkl"
-GENSIM_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_gensim_tensors.pkl"
-LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / "train_local_tensors.pkl"
-LOCAL_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_local_tensors.pkl"
+USE_MINI_DATASET = False
+
+mini_option = "_mini" if USE_MINI_DATASET else ""
+
+GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / f"train_gensim_tensors{mini_option}.pkl"
+GENSIM_VALIDATION_FILEPATH = (
+    DATASET_FILEPATH / f"validation_gensim_tensors{mini_option}.pkl"
+)
+LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / f"train_local_tensors{mini_option}.pkl"
+LOCAL_VALIDATION_FILEPATH = (
+    DATASET_FILEPATH / f"validation_local_tensors{mini_option}.pkl"
+)
 
 
-EPOCHS = 2
+EPOCHS = 30
 
 MODEL_CONFIGS = [
     {
-        "run_name": "no_gensim_50",
-        "use_gensim": False,
-        "encoded_dim": 50,
+        "run_name": "gensim_300",
+        "use_gensim": True,
         "optimizer": "adam",
         "lr": 0.001,
+        "encoded_dim": 300,
     },
     {
-        "run_name": "no_gensim_100",
-        "use_gensim": False,
-        "encoded_dim": 100,
+        "run_name": "gensim_400",
+        "use_gensim": True,
         "optimizer": "adam",
         "lr": 0.001,
+        "encoded_dim": 400,
+    },
+    {
+        "run_name": "gensim_500",
+        "use_gensim": True,
+        "optimizer": "adam",
+        "lr": 0.001,
+        "encoded_dim": 500,
     },
     {
         "run_name": "no_gensim_200",
@@ -60,48 +76,70 @@ MODEL_CONFIGS = [
         "optimizer": "adam",
         "lr": 0.001,
     },
-    {"run_name": "gensim", "use_gensim": True, "optimizer": "adam", "lr": 0.001},
+    {
+        "run_name": "no_gensim_300",
+        "use_gensim": False,
+        "encoded_dim": 300,
+        "optimizer": "adam",
+        "lr": 0.001,
+    },
+    {
+        "run_name": "no_gensim_400",
+        "use_gensim": False,
+        "encoded_dim": 400,
+        "optimizer": "adam",
+        "lr": 0.001,
+    },
 ]
 
 for config in MODEL_CONFIGS:
-    run_name = config["run_name"]
+    run_name = config["run_name"] + mini_option
     use_gensim = config["use_gensim"]
     encoded_dim = config["encoded_dim"]
     optimizer = config["optimizer"]
     lr = config["lr"]
 
     if use_gensim:
-        with open(GENSIM_TRAIN_FILEPATH, "rb") as f:
-            train_data = pickle.load(f)
+        with task(f"Loading {run_name} train data"):
+            with open(GENSIM_TRAIN_FILEPATH, "rb") as f:
+                train_data = pickle.load(f)
 
-        with open(GENSIM_VALIDATION_FILEPATH, "rb") as f:
-            validation_data = pickle.load(f)
+        with task(f"Loading {run_name} validation data"):
+            with open(GENSIM_VALIDATION_FILEPATH, "rb") as f:
+                validation_data = pickle.load(f)
     else:
-        with open(LOCAL_TRAIN_FILEPATH, "rb") as f:
-            train_data = pickle.load(f)
-        with open(LOCAL_VALIDATION_FILEPATH, "rb") as f:
-            validation_data = pickle.load(f)
+        with task(f"Loading {run_name} train data"):
+            with open(LOCAL_TRAIN_FILEPATH, "rb") as f:
+                train_data = pickle.load(f)
+
+        with task(f"Loading {run_name} validation data"):
+            with open(LOCAL_VALIDATION_FILEPATH, "rb") as f:
+                validation_data = pickle.load(f)
 
     total_train_len = math.ceil(len(train_data) / BATCH_SIZE)
     total_val_len = math.ceil(len(validation_data) / BATCH_SIZE)
 
-    tokeniser = Tokeniser(use_gensim=use_gensim)
+    with task(f"Initialising {run_name} tokeniser"):
+        tokeniser = Tokeniser(use_gensim=use_gensim)
 
-    model = TwoTowers(
-        encoded_dim=encoded_dim,
-        use_gensim=use_gensim,
-        token_embed_dims=300 if use_gensim else 50,
-        embed_layer_weights=(
-            torch.load(W2V_EMBED_PATH, weights_only=True) if not use_gensim else None
-        ),
-    ).to(device)
+    with task(f"Initialising {run_name} model"):
+        model = TwoTowers(
+            encoded_dim=encoded_dim,
+            use_gensim=use_gensim,
+            token_embed_dims=300 if use_gensim else 50,
+            embed_layer_weights=(
+                torch.load(W2V_EMBED_PATH, weights_only=True)
+                if not use_gensim
+                else None
+            ),
+        ).to(device)
 
     if optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=lr)
     else:
         raise ValueError(f"Unknown optimizer: {optimizer}")
 
-    wandb.init(project="two_tower_grid_search", name=run_name, config=config)
+    wandb.init(project="two_tower_grid_search_epochs", name=run_name, config=config)
 
     for epoch in range(1, EPOCHS + 1):
         # Train
@@ -112,7 +150,7 @@ for config in MODEL_CONFIGS:
         neg_dist_list = []
         for batch in tqdm(
             train_chunks,
-            desc=f"Training epoch {epoch}",
+            desc=f"{epoch} - training",
             total=total_train_len,
             unit_scale=BATCH_SIZE,
         ):
@@ -131,14 +169,6 @@ for config in MODEL_CONFIGS:
             pos_dist_list.append(pos_dist.item())
             neg_dist_list.append(neg_dist.item())
 
-        wandb.log(
-            {
-                "train_loss": sum(loss_list) / len(loss_list),
-                "train_pos_dist": sum(pos_dist_list) / len(pos_dist_list),
-                "train_neg_dist": sum(neg_dist_list) / len(neg_dist_list),
-            }
-        )
-
         # Validation
         model.eval()
         validation_chunks = more_itertools.chunked(validation_data, BATCH_SIZE)
@@ -148,21 +178,28 @@ for config in MODEL_CONFIGS:
         with torch.inference_mode():
             for batch in tqdm(
                 validation_chunks,
-                desc=f"Validating epoch {epoch}",
+                desc=f"{epoch} - validation losses",
                 total=total_val_len,
                 unit_scale=BATCH_SIZE,
             ):
-                loss, (pos_dist, neg_dist) = model.get_loss_batch(batch)
+                query, pos_samples, neg_samples = zip(*batch)
+                loss, (pos_dist, neg_dist) = model.get_loss_batch(
+                    query, pos_samples, neg_samples
+                )
                 val_loss_list.append(loss.item())
                 val_pos_dist_list.append(pos_dist.item())
                 val_neg_dist_list.append(neg_dist.item())
 
         wandb.log(
             {
+                "train_loss": sum(loss_list) / len(loss_list),
+                "train_pos_dist": sum(pos_dist_list) / len(pos_dist_list),
+                "train_neg_dist": sum(neg_dist_list) / len(neg_dist_list),
                 "val_loss": sum(val_loss_list) / len(val_loss_list),
                 "val_pos_dist": sum(val_pos_dist_list) / len(val_pos_dist_list),
                 "val_neg_dist": sum(val_neg_dist_list) / len(val_neg_dist_list),
-            }
+                "epoch": epoch,
+            },
         )
 
         if not epoch % PERFORMANCE_EVAL_EVERY_N_EPOCHS:
@@ -172,15 +209,21 @@ for config in MODEL_CONFIGS:
             train_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["train"][:200],
+                dataset_split=hg_dataset["train"][:100],
                 faiss_index=faiss_index,
             )
 
             val_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["validation"],
+                dataset_split=hg_dataset["validation"][:100],
                 faiss_index=faiss_index,
             )
-            wandb.log({"train_eval_score": train_score, "val_eval_score": val_score})
+            wandb.log(
+                {
+                    "train_eval_score": float(train_score),
+                    "val_eval_score": float(val_score),
+                    "epoch": epoch,
+                },
+            )
     wandb.finish()
