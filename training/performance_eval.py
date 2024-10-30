@@ -17,7 +17,7 @@ from model.two_towers_modular import TwoTowers
 
 dataset = datasets.load_dataset("imdb")
 
-ALL_DOCS_PATH = root_dir / "data" / "all_docs"
+ALL_DOCS_PATH = root_dir / "dataset" / "two_tower" / "all_docs.txt"
 BATCH_SIZE = 100
 
 RANK_CUTOFF = 100

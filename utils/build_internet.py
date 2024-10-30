@@ -1,9 +1,8 @@
 import datasets
-import pickle
 from tqdm import tqdm
 from pathlib import Path
 
-INTERNET_FILEPATH = Path(f"dataset/internet/all_docs")
+INTERNET_FILEPATH = Path(f"dataset/internet/all_docs.txt")
 INTERNET_FILEPATH.parent.mkdir(parents=True, exist_ok=True)
 
 if __name__ == "__main__":

@@ -30,10 +30,10 @@ W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
 
 DATASET_FILEPATH = root_dir / "dataset/two_tower"
 
-GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / "train_gensim.pkl"
-GENSIM_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_gensim.pkl"
-LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / "train_local.pkl"
-LOCAL_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_local.pkl"
+GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / "train_gensim_tensors.pkl"
+GENSIM_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_gensim_tensors.pkl"
+LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / "train_local_tensors.pkl"
+LOCAL_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_local_tensors.pkl"
 
 
 EPOCHS = 2
