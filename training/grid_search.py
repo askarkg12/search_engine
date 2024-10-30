@@ -24,7 +24,7 @@ from training.performance_eval import (
 
 BATCH_SIZE = 1024
 
-PERFORMANCE_EVAL_EVERY_N_EPOCHS = 4
+PERFORMANCE_EVAL_EVERY_N_EPOCHS = 5
 
 
 W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
@@ -45,15 +45,29 @@ LOCAL_VALIDATION_FILEPATH = (
 )
 
 
-EPOCHS = 20
+EPOCHS = 30
 
 MODEL_CONFIGS = [
     {
-        "run_name": "gensim_200",
-        "use_gensim": True,
+        "run_name": "no_gensim_200",
+        "use_gensim": False,
+        "encoded_dim": 200,
         "optimizer": "adam",
         "lr": 0.001,
-        "encoded_dim": 200,
+    },
+    {
+        "run_name": "no_gensim_300",
+        "use_gensim": False,
+        "encoded_dim": 300,
+        "optimizer": "adam",
+        "lr": 0.001,
+    },
+    {
+        "run_name": "no_gensim_400",
+        "use_gensim": False,
+        "encoded_dim": 400,
+        "optimizer": "adam",
+        "lr": 0.001,
     },
     {
         "run_name": "gensim_300",
@@ -75,13 +89,6 @@ MODEL_CONFIGS = [
         "optimizer": "adam",
         "lr": 0.001,
         "encoded_dim": 500,
-    },
-    {
-        "run_name": "no_gensim_200",
-        "use_gensim": False,
-        "encoded_dim": 200,
-        "optimizer": "adam",
-        "lr": 0.001,
     },
 ]
 
