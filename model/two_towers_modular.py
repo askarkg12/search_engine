@@ -113,7 +113,7 @@ class TwoTowers(nn.Module):
         )
 
         # Shape [N, Lmax]
-        padded_seq_tkns = pad_sequence(token_sequences, batch_first=True)
+        padded_seq_tkns = pad_sequence(token_sequences, batch_first=True).to(device)
 
         # Shape [N, Lmax, E]
         padded_seq_embeds = self.embed_layer(padded_seq_tkns)

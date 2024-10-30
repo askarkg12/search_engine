@@ -16,6 +16,7 @@ sys.path.append(str(root_dir))
 
 from model.two_towers_modular import TwoTowers
 from utils.tokeniser import Tokeniser
+from utils.rich_utils import task
 from training.performance_eval import (
     evaluate_performance_two_towers,
     build_doc_faiss_index,
@@ -71,16 +72,21 @@ for config in MODEL_CONFIGS:
     lr = config["lr"]
 
     if use_gensim:
-        with open(GENSIM_TRAIN_FILEPATH, "rb") as f:
-            train_data = pickle.load(f)
+        with task(f"Loading {run_name} train data"):
+            with open(GENSIM_TRAIN_FILEPATH, "rb") as f:
+                train_data = pickle.load(f)
 
-        with open(GENSIM_VALIDATION_FILEPATH, "rb") as f:
-            validation_data = pickle.load(f)
+        with task(f"Loading {run_name} validation data"):
+            with open(GENSIM_VALIDATION_FILEPATH, "rb") as f:
+                validation_data = pickle.load(f)
     else:
-        with open(LOCAL_TRAIN_FILEPATH, "rb") as f:
-            train_data = pickle.load(f)
-        with open(LOCAL_VALIDATION_FILEPATH, "rb") as f:
-            validation_data = pickle.load(f)
+        with task(f"Loading {run_name} train data"):
+            with open(LOCAL_TRAIN_FILEPATH, "rb") as f:
+                train_data = pickle.load(f)
+
+        with task(f"Loading {run_name} validation data"):
+            with open(LOCAL_VALIDATION_FILEPATH, "rb") as f:
+                validation_data = pickle.load(f)
 
     total_train_len = math.ceil(len(train_data) / BATCH_SIZE)
     total_val_len = math.ceil(len(validation_data) / BATCH_SIZE)
