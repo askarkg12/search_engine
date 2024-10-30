@@ -5,7 +5,7 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: frontend-service
     ports:
-      - "8501:8501"
+      - "80:80"
     networks:
       - app-network
 
@@ -17,11 +17,10 @@ services:
     volumes:
       - ./weights:/workspace/weights
     ports:
-      - "80:80"
+      - "8501:8501"
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
-

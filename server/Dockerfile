@@ -18,4 +18,4 @@ COPY ./utils ./utils
 COPY ./dataset/internet ./dataset/internet
 
 
-CMD ["fastapi", "run", "server/main.py", "--port", "80"]
+CMD ["fastapi", "run", "server/main.py", "--port", "8501"]
