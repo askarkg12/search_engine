@@ -30,17 +30,11 @@ W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
 
 DATASET_FILEPATH = root_dir / "dataset/two_tower"
 
-TRAIN_FILEPATH = DATASET_FILEPATH / "train_strings.pkl"
-VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_strings.pkl"
+GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / "train_gensim.pkl"
+GENSIM_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_gensim.pkl"
+LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / "train_local.pkl"
+LOCAL_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_local.pkl"
 
-with open(TRAIN_FILEPATH, "rb") as f:
-    train_data = pickle.load(f)
-
-with open(VALIDATION_FILEPATH, "rb") as f:
-    validation_data = pickle.load(f)
-
-total_train_len = math.ceil(len(train_data) / BATCH_SIZE)
-total_val_len = math.ceil(len(validation_data) / BATCH_SIZE)
 
 EPOCHS = 2
 
@@ -69,7 +63,6 @@ MODEL_CONFIGS = [
     {"run_name": "gensim", "use_gensim": True, "optimizer": "adam", "lr": 0.001},
 ]
 
-tokeniser = Tokeniser()
 for config in MODEL_CONFIGS:
     run_name = config["run_name"]
     use_gensim = config["use_gensim"]
@@ -77,16 +70,36 @@ for config in MODEL_CONFIGS:
     optimizer = config["optimizer"]
     lr = config["lr"]
 
+    if use_gensim:
+        with open(GENSIM_TRAIN_FILEPATH, "rb") as f:
+            train_data = pickle.load(f)
+
+        with open(GENSIM_VALIDATION_FILEPATH, "rb") as f:
+            validation_data = pickle.load(f)
+    else:
+        with open(LOCAL_TRAIN_FILEPATH, "rb") as f:
+            train_data = pickle.load(f)
+        with open(LOCAL_VALIDATION_FILEPATH, "rb") as f:
+            validation_data = pickle.load(f)
+
+    total_train_len = math.ceil(len(train_data) / BATCH_SIZE)
+    total_val_len = math.ceil(len(validation_data) / BATCH_SIZE)
+
+    tokeniser = Tokeniser(use_gensim=use_gensim)
+
     model = TwoTowers(
-        token_embed_dims=300 if use_gensim else 50,
         encoded_dim=encoded_dim,
         use_gensim=use_gensim,
-        embed_layer_weights=torch.load(W2V_EMBED_PATH, weights_only=True),
-        tokeniser=tokeniser,
+        token_embed_dims=300 if use_gensim else 50,
+        embed_layer_weights=(
+            torch.load(W2V_EMBED_PATH, weights_only=True) if not use_gensim else None
+        ),
     ).to(device)
 
     if optimizer == "adam":
         optimizer = optim.Adam(model.parameters(), lr=lr)
+    else:
+        raise ValueError(f"Unknown optimizer: {optimizer}")
 
     wandb.init(project="two_tower_grid_search", name=run_name, config=config)
 
