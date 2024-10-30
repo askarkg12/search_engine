@@ -3,6 +3,7 @@ from tqdm import tqdm
 
 from pathlib import Path
 import sys
+import gensim.downloader as gs_api
 
 root_repo = Path(__file__).parent.parent
 sys.path.append(str(root_repo))
@@ -11,11 +12,16 @@ from utils.text_utils import preprocess_text
 
 
 class Tokeniser:
-    def __init__(self, lookup_pkl="utils/lookup_updated.pkl") -> None:
-        with open(lookup_pkl, "rb") as f:
-            word_to_id, id_to_word = pickle.load(f)
-        self.words_to_ids = word_to_id
-        self.ids_to_words = id_to_word
+    def __init__(self, lookup_pkl="utils/lookup_updated.pkl", use_gensim=False) -> None:
+        if use_gensim:
+            w2v = gs_api.load("word2vec-google-news-300")
+            self.ids_to_words = w2v.index_to_key
+            self.words_to_ids = w2v.key_to_index
+        else:
+            with open(lookup_pkl, "rb") as f:
+                word_to_id, id_to_word = pickle.load(f)
+            self.words_to_ids = word_to_id
+            self.ids_to_words = id_to_word
         self.default_token = 0
         self.preprocess = preprocess_text
 

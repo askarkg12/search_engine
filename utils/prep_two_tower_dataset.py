@@ -4,15 +4,27 @@ from tqdm import tqdm
 from pathlib import Path
 from tokeniser import Tokeniser
 from random import randrange
+import sys
+
+root_dir = Path(__file__).parent.parent
+sys.path.append(str(root_dir))
+
+from rich_utils import task
 
 DATASET_FILEPATH = Path("dataset/two_tower")
 DATASET_FILEPATH.mkdir(parents=True, exist_ok=True)
 
+# TOKENISER = "gensim"
+TOKENISER = "local"
+
 
 if __name__ == "__main__":
-    tokeniser = Tokeniser()
-    tknz = tokeniser.tokenise_string
-    dataset = datasets.load_dataset("microsoft/ms_marco", "v1.1")
+    with task("Initialising tokeniser"):
+        tokeniser = Tokeniser(use_gensim=TOKENISER == "gensim")
+        tknz = tokeniser.tokenise_string
+
+    with task("Loading dataset"):
+        dataset = datasets.load_dataset("microsoft/ms_marco", "v1.1")
 
     splits = ["test", "validation", "train"]
     all_documents: set[str] = set()
@@ -23,8 +35,9 @@ if __name__ == "__main__":
         for passage in tqdm(passages, desc=split + " passages"):
             all_documents.update(set(passage["passage_text"]))
 
-    all_documents = list(all_documents)
-    internet_length = len(all_documents)
+    with task("Creating document list"):
+        all_documents = list(all_documents)
+        internet_length = len(all_documents)
 
     for split in splits:
         split_data = []
@@ -47,5 +60,5 @@ if __name__ == "__main__":
             ]
             split_data.extend(data)
 
-        with open(DATASET_FILEPATH / split, "wb") as f:
+        with open(DATASET_FILEPATH / f"{split}_{TOKENISER}.pkl", "wb") as f:
             pickle.dump(split_data, f)
