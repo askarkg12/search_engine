@@ -24,20 +24,28 @@ from training.performance_eval import (
 
 BATCH_SIZE = 1024
 
-PERFORMANCE_EVAL_EVERY_N_EPOCHS = 10
+PERFORMANCE_EVAL_EVERY_N_EPOCHS = 2
 
 
 W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
 
-DATASET_FILEPATH = root_dir / "dataset/two_tower"
+DATASET_FILEPATH = root_dir / "dataset/two_tower/prep"
 
-GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / "train_gensim_tensors.pkl"
-GENSIM_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_gensim_tensors.pkl"
-LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / "train_local_tensors.pkl"
-LOCAL_VALIDATION_FILEPATH = DATASET_FILEPATH / "validation_local_tensors.pkl"
+USE_MINI_DATASET = True
+
+mini_option = "_mini" if USE_MINI_DATASET else ""
+
+GENSIM_TRAIN_FILEPATH = DATASET_FILEPATH / f"train_gensim_tensors{mini_option}.pkl"
+GENSIM_VALIDATION_FILEPATH = (
+    DATASET_FILEPATH / f"validation_gensim_tensors{mini_option}.pkl"
+)
+LOCAL_TRAIN_FILEPATH = DATASET_FILEPATH / f"train_local_tensors{mini_option}.pkl"
+LOCAL_VALIDATION_FILEPATH = (
+    DATASET_FILEPATH / f"validation_local_tensors{mini_option}.pkl"
+)
 
 
-EPOCHS = 2
+EPOCHS = 10
 
 MODEL_CONFIGS = [
     {
@@ -67,7 +75,7 @@ MODEL_CONFIGS = [
 for config in MODEL_CONFIGS:
     run_name = config["run_name"]
     use_gensim = config["use_gensim"]
-    encoded_dim = config["encoded_dim"]
+    encoded_dim = config["encoded_dim"] if not use_gensim else 300
     optimizer = config["optimizer"]
     lr = config["lr"]
 
@@ -118,7 +126,7 @@ for config in MODEL_CONFIGS:
         neg_dist_list = []
         for batch in tqdm(
             train_chunks,
-            desc=f"Training epoch {epoch}",
+            desc=f"{epoch} - training",
             total=total_train_len,
             unit_scale=BATCH_SIZE,
         ):
@@ -154,11 +162,14 @@ for config in MODEL_CONFIGS:
         with torch.inference_mode():
             for batch in tqdm(
                 validation_chunks,
-                desc=f"Validating epoch {epoch}",
+                desc=f"{epoch} - validation losses",
                 total=total_val_len,
                 unit_scale=BATCH_SIZE,
             ):
-                loss, (pos_dist, neg_dist) = model.get_loss_batch(batch)
+                query, pos_samples, neg_samples = zip(*batch)
+                loss, (pos_dist, neg_dist) = model.get_loss_batch(
+                    query, pos_samples, neg_samples
+                )
                 val_loss_list.append(loss.item())
                 val_pos_dist_list.append(pos_dist.item())
                 val_neg_dist_list.append(neg_dist.item())
@@ -178,15 +189,20 @@ for config in MODEL_CONFIGS:
             train_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["train"][:200],
+                dataset_split=hg_dataset["train"][:500],
                 faiss_index=faiss_index,
             )
 
             val_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["validation"],
+                dataset_split=hg_dataset["validation"][:500],
                 faiss_index=faiss_index,
             )
-            wandb.log({"train_eval_score": train_score, "val_eval_score": val_score})
+            wandb.log(
+                {
+                    "train_eval_score": float(train_score),
+                    "val_eval_score": float(val_score),
+                }
+            )
     wandb.finish()

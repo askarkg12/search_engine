@@ -15,31 +15,31 @@ sys.path.append(str(root_dir))
 
 from rich_utils import task
 
-DATASET_FILEPATH = root_dir / "dataset" / "two_tower" / "prep"
-DATASET_FILEPATH.mkdir(parents=True, exist_ok=True)
+DATASET_FOLDER = root_dir / "dataset" / "two_tower" / "prep"
+DATASET_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
 if __name__ == "__main__":
+    with task(f"Loading dataset"):
+        dataset = datasets.load_dataset("microsoft/ms_marco", "v1.1")
+
+    splits = ["test", "validation", "train"]
+    all_documents: set[str] = set()
+
+    for split in splits:
+
+        passages = dataset[split]["passages"]
+        for passage in tqdm(passages, desc=split + " passages"):
+            all_documents.update(set(passage["passage_text"]))
+
+    with task("Creating document list"):
+        all_documents = list(all_documents)
+        internet_length = len(all_documents)
+
     for TOKENISER in ["gensim", "local"]:
-        with task("Initialising tokeniser"):
+        with task(f"Initialising tokeniser ({TOKENISER})"):
             tokeniser = Tokeniser(use_gensim=TOKENISER == "gensim")
             tknz = tokeniser.tokenise_string
-
-        with task("Loading dataset"):
-            dataset = datasets.load_dataset("microsoft/ms_marco", "v1.1")
-
-        splits = ["test", "validation", "train"]
-        all_documents: set[str] = set()
-
-        for split in splits:
-
-            passages = dataset[split]["passages"]
-            for passage in tqdm(passages, desc=split + " passages"):
-                all_documents.update(set(passage["passage_text"]))
-
-        with task("Creating document list"):
-            all_documents = list(all_documents)
-            internet_length = len(all_documents)
 
         for split in splits:
             split_data = []
@@ -47,7 +47,7 @@ if __name__ == "__main__":
             rows = tqdm(
                 enumerate(dataset[split]),
                 total=dataset[split].num_rows,
-                desc=f"Tokenising {split}",
+                desc=f"Tokenising {split} ({TOKENISER})",
             )
             for row_index, row in rows:
                 query_tkns = tknz(row["query"])
@@ -68,17 +68,21 @@ if __name__ == "__main__":
 
                 split_data.extend(data)
                 split_data_tensors.extend(data_tensors)
-            with open(DATASET_FILEPATH / f"{split}_{TOKENISER}.pkl", "wb") as f:
-                pickle.dump(split_data, f)
+
+            with task(f"Saving {split} integers ({TOKENISER})"):
+                with open(DATASET_FOLDER / f"{split}_{TOKENISER}.pkl", "wb") as f:
+                    pickle.dump(split_data, f)
 
             if SAVE_AS_TENSORS:
-                with open(
-                    DATASET_FILEPATH / f"{split}_{TOKENISER}_tensors.pkl", "wb"
-                ) as f:
-                    pickle.dump(split_data_tensors, f)
-
                 # Save a mini version for testing
-                with open(
-                    DATASET_FILEPATH / f"{split}_{TOKENISER}_tensors_mini.pkl", "wb"
-                ) as f:
-                    pickle.dump(split_data_tensors[:1000], f)
+                with task(f"Saving {split} tensors mini ({TOKENISER})"):
+                    with open(
+                        DATASET_FOLDER / f"{split}_{TOKENISER}_tensors_mini.pkl", "wb"
+                    ) as f:
+                        pickle.dump(split_data_tensors[:10000], f)
+
+                with task(f"Saving {split} tensors ({TOKENISER})"):
+                    with open(
+                        DATASET_FOLDER / f"{split}_{TOKENISER}_tensors.pkl", "wb"
+                    ) as f:
+                        pickle.dump(split_data_tensors, f)

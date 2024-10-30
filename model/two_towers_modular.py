@@ -149,7 +149,7 @@ class TwoTowers(nn.Module):
         return self.encode_sequence_single(doc, self.doc_encoder)
 
     # Forward because model is used in app
-    def forward(self, query: list[int]):
+    def forward(self, query: list[int]) -> torch.Tensor:
         return self.encode_query_single(query)
 
 
