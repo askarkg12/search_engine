@@ -112,7 +112,8 @@ for config in MODEL_CONFIGS:
     total_train_len = math.ceil(len(train_data) / BATCH_SIZE)
     total_val_len = math.ceil(len(validation_data) / BATCH_SIZE)
 
-    tokeniser = Tokeniser(use_gensim=use_gensim)
+    with task(f"Initialising {run_name} tokeniser"):
+        tokeniser = Tokeniser(use_gensim=use_gensim)
 
     with task(f"Initialising {run_name} model"):
         model = TwoTowers(
