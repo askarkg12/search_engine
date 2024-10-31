@@ -28,7 +28,6 @@ class TwoTowers(nn.Module):
         token_embed_dims: int,
         encoded_dim: int,
         use_gensim: bool = False,
-        freeze_embeds: bool = False,
         vocab_size: int = 81_547,
         margin: float = 1.0,
         embed_layer_weights: torch.Tensor | None = None,
@@ -42,15 +41,9 @@ class TwoTowers(nn.Module):
         if use_gensim:
             w2v: KeyedVectors = gs_api.load("word2vec-google-news-300")
             embeddings = w2v.vectors
-            if freeze_embeds:
-                # NOTE This takes will be a very big tensor to save
-                self.embed_layer = nn.Embedding.from_pretrained(
-                    torch.from_numpy(embeddings), freeze=True
-                ).to(device)
-            else:
-                self.embed_layer = nn.Embedding.from_pretrained(
-                    torch.from_numpy(embeddings), freeze=False
-                ).to(device)
+            self.embed_layer = nn.Embedding.from_pretrained(
+                torch.from_numpy(embeddings), freeze=freeze_embed_layer
+            ).to(device)
         else:
             if embed_layer_weights is None:
                 self.embed_layer = nn.Embedding(
@@ -152,8 +145,21 @@ class TwoTowers(nn.Module):
     def forward(self, query: list[int]) -> torch.Tensor:
         return self.encode_query_single(query)
 
+    def save_without_embed_layer(self, filepath: Path):
+        state_dict = self.state_dict()
+        del state_dict["embed_layer.weight"]
+        torch.save(state_dict, filepath)
+
+
+def load_two_tower_without_embed(filepath: Path, **kwargs):
+    model = TwoTowers(**kwargs)
+    model.load_state_dict(torch.load(filepath), strict=False)
+    return model
+
 
 if __name__ == "__main__":
-    model = TwoTowers(token_embed_dims=300, encoded_dim=300, use_gensim=True)
-    torch.save(model.state_dict(), root_dir / "model/weights/two_towers_gensim.pth")
-    pass
+    model = TwoTowers(encoded_dim=400, use_gensim=True)
+    save_path = root_dir / "weights/aaa.pth"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    model.save_without_embed_layer(save_path)

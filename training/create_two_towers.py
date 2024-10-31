@@ -37,7 +37,7 @@ with torch.no_grad():
 
 two_tower_project = "two-towers-marco"
 wandb.init(project=two_tower_project)
-model_save_path = Path("model/checkpoints/two_tower_model/model.pth")
+model_save_path = Path("weights/two_tower_model.pth")
 model_save_path.parent.mkdir(parents=True, exist_ok=True)
 torch.save(two_tower.state_dict(), model_save_path)
 artifact = wandb.Artifact(

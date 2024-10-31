@@ -25,6 +25,6 @@ model.load_state_dict(
 print("Model pulled")
 
 w2v_embed_weights = model.center_embed.weight.data
-embed_weights_path = Path("model/weights/w2v_embeddings.pth")
+embed_weights_path = Path("weights/w2v_embeddings.pth")
 embed_weights_path.parent.mkdir(parents=True, exist_ok=True)
 torch.save(w2v_embed_weights, embed_weights_path)

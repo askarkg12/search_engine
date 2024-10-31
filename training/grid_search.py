@@ -27,7 +27,7 @@ BATCH_SIZE = 1024
 PERFORMANCE_EVAL_EVERY_N_EPOCHS = 5
 
 
-W2V_EMBED_PATH = root_dir / "model/weights/w2v_embeddings.pth"
+W2V_EMBED_PATH = root_dir / "weights/w2v_embeddings.pth"
 
 DATASET_FILEPATH = root_dir / "dataset/two_tower/prep"
 
@@ -226,4 +226,17 @@ for config in MODEL_CONFIGS:
                     "epoch": epoch,
                 },
             )
+
+            # Save model
+            save_path = root_dir / f"weights/checkpoints/two_towers_{run_name}.pth"
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            model.save_without_embed_layer(save_path)
+
+            # Send artifact to wandb
+            artifact = wandb.Artifact(
+                f"two_towers_{run_name}", type="model", metadata=config
+            )
+            artifact.add_file(save_path)
+            wandb.log_artifact(artifact)
+
     wandb.finish()
