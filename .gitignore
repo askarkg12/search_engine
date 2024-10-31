@@ -3,7 +3,7 @@ dataset
 artifacts
 data
 app
-# weights
+weights/server
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
