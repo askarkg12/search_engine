@@ -31,6 +31,7 @@ index_to_doc: dict[int, str] = {}
 doc_to_index: dict[str, int] = {}
 with open(ALL_DOCS_PATH, "r", encoding="utf-8") as f:
     for index, line in enumerate(f):
+        line = line.rstrip()
         index_to_doc[index] = line
         doc_to_index[line] = index
 
@@ -55,7 +56,10 @@ def build_doc_faiss_index(model: TwoTowers, tokeniser: Tokeniser) -> float:
 
     all_doc_encodings = np.concatenate(all_doc_encodings_list, axis=0)
     index = faiss.IndexFlatIP(all_doc_encodings.shape[1])
-    index.add(all_doc_encodings)
+    all_doc_encodings_normalized = all_doc_encodings / np.linalg.norm(
+        all_doc_encodings, axis=1, keepdims=True
+    )
+    index.add(all_doc_encodings_normalized)
     return index
 
 
@@ -75,14 +79,17 @@ def evaluate_performance_two_towers(
     for row in tqdm(zipped_dataset_split, desc="Evaluating performance"):
         query = row["query"]
 
-        pos_docs = row["passages"]["passage_text"]
-        # TODO Newline should be in the index
-        pos_doc_indices = [doc_to_index[doc + "\n"] for doc in pos_docs]
+        pos_docs: list[str] = row["passages"]["passage_text"]
+        pos_docs = [doc.rstrip() for doc in pos_docs]
+        pos_doc_indices = [doc_to_index[doc] for doc in pos_docs]
 
         query_tokens = torch.tensor(tokeniser.tokenise_string(query))
         query_encoding_tensor: torch.Tensor = model(query_tokens).detach().cpu()
         query_encoding = query_encoding_tensor.unsqueeze(0).numpy()
-        _, pred_indices = faiss_index.search(query_encoding, RANK_CUTOFF)
+        query_encoding_normalized = query_encoding / np.linalg.norm(
+            query_encoding, axis=1, keepdims=True
+        )
+        _, pred_indices = faiss_index.search(query_encoding_normalized, RANK_CUTOFF)
 
         query_scores = []
         for pos_index in pos_doc_indices:

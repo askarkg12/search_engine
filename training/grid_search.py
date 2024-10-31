@@ -22,7 +22,7 @@ from training.performance_eval import (
     build_doc_faiss_index,
 )
 
-BATCH_SIZE = 1024
+BATCH_SIZE = 700
 
 PERFORMANCE_EVAL_EVERY_N_EPOCHS = 5
 
@@ -45,50 +45,22 @@ LOCAL_VALIDATION_FILEPATH = (
 )
 
 
-EPOCHS = 30
+EPOCHS = 100
 
 MODEL_CONFIGS = [
     {
-        "run_name": "gensim_300",
-        "use_gensim": True,
-        "optimizer": "adam",
-        "lr": 0.001,
-        "encoded_dim": 300,
-    },
-    {
-        "run_name": "gensim_400",
-        "use_gensim": True,
-        "optimizer": "adam",
-        "lr": 0.001,
-        "encoded_dim": 400,
-    },
-    {
-        "run_name": "gensim_500",
-        "use_gensim": True,
-        "optimizer": "adam",
-        "lr": 0.001,
-        "encoded_dim": 500,
-    },
-    {
-        "run_name": "no_gensim_200",
-        "use_gensim": False,
-        "encoded_dim": 200,
-        "optimizer": "adam",
-        "lr": 0.001,
-    },
-    {
-        "run_name": "no_gensim_300",
-        "use_gensim": False,
-        "encoded_dim": 300,
-        "optimizer": "adam",
-        "lr": 0.001,
-    },
-    {
-        "run_name": "no_gensim_400",
+        "run_name": "no_gensim_400_long",
         "use_gensim": False,
         "encoded_dim": 400,
         "optimizer": "adam",
-        "lr": 0.001,
+        "lr": 0.002,
+    },
+    {
+        "run_name": "gensim_400_long",
+        "use_gensim": True,
+        "optimizer": "adam",
+        "lr": 0.002,
+        "encoded_dim": 400,
     },
 ]
 
@@ -209,14 +181,14 @@ for config in MODEL_CONFIGS:
             train_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["train"][:100],
+                dataset_split=hg_dataset["train"][:200],
                 faiss_index=faiss_index,
             )
 
             val_score = evaluate_performance_two_towers(
                 model=model,
                 tokeniser=tokeniser,
-                dataset_split=hg_dataset["validation"][:100],
+                dataset_split=hg_dataset["validation"][:200],
                 faiss_index=faiss_index,
             )
             wandb.log(
@@ -230,7 +202,10 @@ for config in MODEL_CONFIGS:
             # Save model
             save_path = root_dir / f"weights/checkpoints/two_towers_{run_name}.pth"
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            model.save_without_embed_layer(save_path)
+            if use_gensim:
+                model.save_without_embed_layer(save_path)
+            else:
+                torch.save(model.state_dict(), save_path)
 
             # Send artifact to wandb
             artifact = wandb.Artifact(
