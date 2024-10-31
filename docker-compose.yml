@@ -15,7 +15,7 @@ services:
       dockerfile: server/Dockerfile
     container_name: server-service
     volumes:
-      - ./weights:/workspace/weights
+      - ./weights/server:/workspace/weights/server
     ports:
       - "8501:8501"
     networks:
