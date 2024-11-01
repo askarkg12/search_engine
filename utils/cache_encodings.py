@@ -1,5 +1,7 @@
 from pathlib import Path
+import faiss
 import math
+import numpy as np
 import torch
 from more_itertools import chunked
 from tqdm import tqdm
@@ -9,74 +11,59 @@ import sys
 repo_root = Path(__file__).parent.parent
 sys.path.append(str(repo_root))
 
-from model.two_towers import TwoTowers
+from model.two_towers_modular import TwoTowers
+from training.performance_eval import ALL_DOCS_PATH, BATCH_SIZE, total_docs_count
 from utils.tokeniser import Tokeniser
 
 DOCS_PATH = Path("dataset/internet/all_docs")
 
-USE_WANDB = True
-BATCH_SIZE = 10
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 map_location = torch.device(device)
 
-if USE_WANDB:
-    import wandb
 
-    two_tower_project = "two-towers-marco"
-    wandb.init(project=two_tower_project)
+def build_doc_faiss_index(model: TwoTowers, tokeniser: Tokeniser) -> faiss.IndexFlatIP:
+    all_doc_encodings_list: list[np.ndarray] = []
+    # Build doc faiss index
+    with torch.inference_mode():
+        with open(ALL_DOCS_PATH, "r") as f:
+            for chunk in tqdm(
+                chunked(f, BATCH_SIZE),
+                desc="Encoding documents",
+                total=math.ceil(total_docs_count / BATCH_SIZE),
+            ):
+                doc_tokens = [
+                    torch.tensor(tokeniser.tokenise_string(doc)) for doc in chunk
+                ]
 
-    print("Pulling model")
-    start_checkpoint_artifact = wandb.use_artifact(
-        "askarkg12-personal/two-towers-marco/two-tower-model:latest", type="model"
+                doc_encodings = model.encode_docs(doc_tokens).detach().cpu().numpy()
+
+                all_doc_encodings_list.append(doc_encodings)
+
+    all_doc_encodings = np.concatenate(all_doc_encodings_list, axis=0)
+    index = faiss.IndexFlatIP(all_doc_encodings.shape[1])
+    all_doc_encodings_normalized = all_doc_encodings / np.linalg.norm(
+        all_doc_encodings, axis=1, keepdims=True
     )
-    artifact_dir = Path(start_checkpoint_artifact.download())
-    start_epoch = start_checkpoint_artifact.metadata["epoch"]
-    vocab_size = start_checkpoint_artifact.metadata["vocab_size"]
-    encoding_dim = start_checkpoint_artifact.metadata["encoding_dim"]
-    embed_dim = start_checkpoint_artifact.metadata["embedding_dim"]
-
-    model_path = artifact_dir / "model.pth"
-else:
-    model_path = Path("app/weights/tt_model.pth")
-    from server.processor import vocab_size, embed_dim, encoding_dim
+    index.add(all_doc_encodings_normalized)
+    return index
 
 
-model = TwoTowers(
-    vocab_size=vocab_size, token_embed_dims=embed_dim, encoded_dim=encoding_dim
-).to(device)
+if __name__ == "__main__":
+    # Load model
+    model = TwoTowers(
+        token_embed_dims=50,
+        encoded_dim=400,
+        use_gensim=False,
+    )
+    checkpoint_path = Path("weights/server/tt_weights.pth")
+    model.load_state_dict(
+        torch.load(checkpoint_path, map_location=map_location, weights_only=True),
+        strict=False,
+    )
+    tokeniser = Tokeniser(use_gensim=False)
+    model.eval()
+    with torch.inference_mode():
+        faiss_index = build_doc_faiss_index(model, tokeniser)
 
-model.load_state_dict(
-    torch.load(model_path, weights_only=True, map_location=map_location)
-)
-print("Model loaded")
-
-tokeniser = Tokeniser()
-
-doc_encodings_list = []
-
-with open(DOCS_PATH, "rb") as f:
-    total = sum(1 for _ in f)
-
-early_stop_count = 0
-
-with torch.inference_mode():
-    with open(DOCS_PATH, "r", encoding="utf-8") as f:
-
-        for chunk in tqdm(
-            chunked(f, BATCH_SIZE),
-            desc="Encoding documents",
-            total=math.ceil(total / BATCH_SIZE),
-        ):
-            doc_tokens = [tokeniser.tokenise_string(doc) for doc in chunk]
-
-            doc_encodings = model.encode_docs(doc_tokens)
-
-            doc_encodings_list.append(doc_encodings)
-
-        
-
-doc_encodings = torch.cat(doc_encodings_list, dim=0)
-aaa = Path("app/weights/doc_encodings.pth")
-aaa.parent.mkdir(exist_ok=True, parents=True)
-torch.save(doc_encodings, aaa)
+    faiss.write_index(faiss_index, str(repo_root / "weights/server/faiss_index.idx"))

@@ -4,9 +4,7 @@ import torch
 import torch.nn as nn
 import datasets
 import faiss
-from more_itertools import chunked
 from tqdm import tqdm
-import math
 import numpy as np
 
 root_dir = Path(__file__).parent.parent
@@ -34,33 +32,6 @@ with open(ALL_DOCS_PATH, "r", encoding="utf-8") as f:
         line = line.rstrip()
         index_to_doc[index] = line
         doc_to_index[line] = index
-
-
-def build_doc_faiss_index(model: TwoTowers, tokeniser: Tokeniser) -> float:
-    all_doc_encodings_list: list[np.ndarray] = []
-    # Build doc faiss index
-    with torch.inference_mode():
-        with open(ALL_DOCS_PATH, "r") as f:
-            for chunk in tqdm(
-                chunked(f, BATCH_SIZE),
-                desc="Encoding documents",
-                total=math.ceil(total_docs_count / BATCH_SIZE),
-            ):
-                doc_tokens = [
-                    torch.tensor(tokeniser.tokenise_string(doc)) for doc in chunk
-                ]
-
-                doc_encodings = model.encode_docs(doc_tokens).detach().cpu().numpy()
-
-                all_doc_encodings_list.append(doc_encodings)
-
-    all_doc_encodings = np.concatenate(all_doc_encodings_list, axis=0)
-    index = faiss.IndexFlatIP(all_doc_encodings.shape[1])
-    all_doc_encodings_normalized = all_doc_encodings / np.linalg.norm(
-        all_doc_encodings, axis=1, keepdims=True
-    )
-    index.add(all_doc_encodings_normalized)
-    return index
 
 
 def evaluate_performance_two_towers(

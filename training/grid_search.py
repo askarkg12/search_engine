@@ -9,6 +9,8 @@ import wandb
 import more_itertools
 import math
 
+from utils.cache_encodings import build_doc_faiss_index
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 root_dir = Path(__file__).parent.parent
@@ -19,7 +21,6 @@ from utils.tokeniser import Tokeniser
 from utils.rich_utils import task
 from training.performance_eval import (
     evaluate_performance_two_towers,
-    build_doc_faiss_index,
 )
 
 BATCH_SIZE = 700
