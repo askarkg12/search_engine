@@ -14,16 +14,16 @@ from pathlib import Path
 from torch.nn.functional import cosine_similarity
 
 # CACHED_ENCODINGS_PATH = Path("weights/doc_encodings.pth")
-FAISS_INDEX_PATH = Path("weights/server/faiss_index.faiss")
-TT_MODEL_PATH = Path("weights/server/tt_weights.pth")
-DOCS_PATH = Path("dataset/internet/all_docs")
+FAISS_INDEX_PATH = root_repo / "weights/server/faiss_index.idx"
+TT_MODEL_PATH = root_repo / "weights/server/tt_weights.pth"
+DOCS_PATH = root_repo / "dataset/two_tower/all_docs.txt"
 
 USE_GENSIM = False
 
 # TODO: Get these from the model metadata or config
 VOCAB_SIZE = 81_547
 ENCODING_DIM = 400
-EMBED_DIM = 300 if not USE_GENSIM else 50
+EMBED_DIM = 300 if USE_GENSIM else 50
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 map_location = torch.device(device)
@@ -53,17 +53,17 @@ tokeniser = Tokeniser()
 faiss_index: faiss.IndexFlatIP = faiss.read_index(str(FAISS_INDEX_PATH))
 
 
-index_to_doc: dict[int, str] = {}
-doc_to_index: dict[str, int] = {}
+# index_to_doc: list[str] = []
+# with open(DOCS_PATH, "r", encoding="utf-8") as f:
+#     for index, line in enumerate(f):
+#         line = line.rstrip()
+#         index_to_doc.append(line)
 with open(DOCS_PATH, "r", encoding="utf-8") as f:
-    for index, line in enumerate(f):
-        line = line.rstrip()
-        index_to_doc[index] = line
-        doc_to_index[line] = index
+    index_to_doc = [line.rstrip() for line in f]
 
 
 def process_query(query: str):
-    tokens = tokeniser.tokenise_string(query)
+    tokens = torch.tensor(tokeniser.tokenise_string(query), dtype=torch.long)
     query_encoding = (
         model.encode_query_single(tokens).unsqueeze(0).detach().cpu().numpy()
     )
@@ -78,8 +78,6 @@ def process_query(query: str):
 
 
 if __name__ == "__main__":
-    for i in range(5):
-        print(index_to_doc[i])
     askar_resp = process_query("King queen")
     same_resp = process_query("Sam")
     pass
