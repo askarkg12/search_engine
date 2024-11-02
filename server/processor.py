@@ -72,9 +72,9 @@ def process_query(query: str):
         query_encoding, axis=1, keepdims=True
     )
 
-    _, top_k_indices = faiss_index.search(query_encoding_normalized, 10)
+    distances, top_k_indices = faiss_index.search(query_encoding_normalized, 10)
 
-    return [index_to_doc[i] for i in top_k_indices[0]]
+    return list(zip(distances[0].tolist(), [index_to_doc[i] for i in top_k_indices[0]]))
 
 
 if __name__ == "__main__":

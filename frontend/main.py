@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 # Set up the Streamlit app title
-st.title("API Search Application")
+st.title("Query based search =]")
 
 # Create a text input for search queries
 query = st.text_input("Enter your search query")
@@ -28,12 +28,12 @@ if query:
     st.write(f"Showing results for: **{query}**")
 
     # Fetch results from the API
-    results = fetch_results(query)
+    results: list[tuple[float, str]] = fetch_results(query)
 
     # Display results in a list format
     if results:
         for idx, result in enumerate(results):
-            st.write(f"{idx + 1}. {result}")
-            # st.write(result['description'])
+            st.write(f"{idx + 1}. Result score: {result[0]:.3f}")
+            st.write(result[1])
     else:
         st.write("No results found.")
