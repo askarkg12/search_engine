@@ -102,6 +102,53 @@ class TripletDataset(Dataset):
         )
 
 
+class EvalDataset(Dataset):
+    def __init__(
+        self,
+        dataset_split: dict,
+        tokeniser: Tokeniser,
+    ):
+        # Create lookup set for all docs
+        all_docs_str_set = set()
+        passages = dataset_split["passages"]
+        for passage in tqdm(passages):
+            # At this point passage is a dict
+            passage_texts = passage["passage_text"]
+            all_docs_str_set.update(set(passage_texts))
+
+        all_docs_strs = list(all_docs_str_set)
+        doc_to_idx = {doc: idx for idx, doc in enumerate(all_docs_strs)}
+
+        rows = tqdm(
+            enumerate(dataset_split),
+            total=len(dataset_split),
+            desc=f"Tokenising",
+        )
+
+        self.data: list[tuple[TknSeq, list[int]]] = []
+
+        for _, row in rows:
+            query_tkns = tokeniser.tokenise_string(row["query"])
+            pos_samples = row["passages"]["passage_text"]
+            pos_doc_ids = [doc_to_idx[sample] for sample in pos_samples]
+            self.data.append((query_tkns, pos_doc_ids))
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx) -> tuple[TknSeq, list[int]]:
+        return self.data[idx]
+
+    def collate_fn(self, batch: list[tuple[TknSeq, list[int]]]):
+        query, pos_doc_ids = zip(*batch)
+
+        query_lens = torch.tensor([len(q) for q in query], dtype=torch.int16)
+        query_tkn_seqs = [torch.tensor(q, dtype=torch.int32) for q in query]
+        padded_query = pad_sequence(query_tkn_seqs, batch_first=True)
+
+        return padded_query, query_lens, pos_doc_ids
+
+
 if __name__ == "__main__":
     import datasets
     from torch.utils.data import DataLoader
@@ -114,12 +161,19 @@ if __name__ == "__main__":
     with task("Loading dataset"):
         dataset_split = datasets.load_dataset("microsoft/ms_marco", "v1.1")["test"]
 
-    with task("Initialising dataset"):
+    with task("Initialising Triplet dataset"):
         dataset_test = TripletDataset(dataset_split, tokeniser)
 
-    test_dataloader = DataLoader(
-        dataset_test, batch_size=16, collate_fn=dataset_test.collate_fn
-    )
+    with task("Initialising Eval dataset"):
+        dataset_eval = EvalDataset(dataset_split, tokeniser)
 
-    for batch in test_dataloader:
+    with task("Creating dataloaders"):
+        triplet_dataloader = DataLoader(
+            dataset_test, batch_size=16, collate_fn=dataset_test.collate_fn
+        )
+        eval_dataloader = DataLoader(
+            dataset_eval, batch_size=16, collate_fn=dataset_eval.collate_fn
+        )
+
+    for batch in eval_dataloader:
         print(batch)
