@@ -84,15 +84,15 @@ class PoolingEncoder(nn.Module):
         layers = []
 
         # I want to basically gradually shift the Linear layer sizes
-        step = (embedding_size - encoded_size) / num_layers
+        step = (encoded_size - embedding_size) / num_layers
         output_dims = [embedding_size + int(step * i) for i in range(1, num_layers + 1)]
-        input_dims = [encoded_size] + output_dims[:-1]
+        input_dims = [embedding_size] + output_dims[:-1]
 
         for input_dim, output_dim in zip(input_dims[:-1], output_dims[:-1]):
             layers.append(nn.Linear(input_dim, output_dim))
             layers.append(nn.ReLU())
 
-        layers.append(nn.Linear(input_dims[-1], embedding_size))
+        layers.append(nn.Linear(input_dims[-1], encoded_size))
 
         self.mlp = nn.Sequential(*layers)
 
@@ -112,3 +112,11 @@ class PoolingEncoder(nn.Module):
         )
 
         return self.mlp(pooled_embeddings)
+
+
+if __name__ == "__main__":
+    embedder = PoolingEncoder(embedding_size=127, encoded_size=423, num_layers=3)
+
+    input = torch.randn(10, 127)
+    output = embedder.mlp(input)
+    pass
