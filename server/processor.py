@@ -53,11 +53,6 @@ tokeniser = Tokeniser()
 faiss_index: faiss.IndexFlatIP = faiss.read_index(str(FAISS_INDEX_PATH))
 
 
-# index_to_doc: list[str] = []
-# with open(DOCS_PATH, "r", encoding="utf-8") as f:
-#     for index, line in enumerate(f):
-#         line = line.rstrip()
-#         index_to_doc.append(line)
 with open(DOCS_PATH, "r", encoding="utf-8") as f:
     index_to_doc = [line.rstrip() for line in f]
 
@@ -72,9 +67,11 @@ def process_query(query: str):
         query_encoding, axis=1, keepdims=True
     )
 
-    distances, top_k_indices = faiss_index.search(query_encoding_normalized, 10)
+    similarities, top_k_indices = faiss_index.search(query_encoding_normalized, 10)
 
-    return list(zip(distances[0].tolist(), [index_to_doc[i] for i in top_k_indices[0]]))
+    return list(
+        zip(similarities[0].tolist(), [index_to_doc[i] for i in top_k_indices[0]])
+    )
 
 
 if __name__ == "__main__":
